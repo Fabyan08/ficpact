@@ -1,0 +1,1636 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LIVE PUZZLE — Hand Tracking Experience</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&display=swap");
+
+      :root {
+        --neon: #9aff00;
+        --neon30: rgba(154, 255, 0, 0.3);
+        --neon10: rgba(154, 255, 0, 0.1);
+        --neon05: rgba(154, 255, 0, 0.05);
+        --bg: #080808;
+        --red: #ff3b3b;
+        --mono: "Share Tech Mono", monospace;
+        --ui: "Rajdhani", sans-serif;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: #fff;
+        font-family: var(--mono);
+        overflow: hidden;
+        width: 100vw;
+        height: 100vh;
+        cursor: none;
+        user-select: none;
+      }
+
+      /* cursor */
+      #cursor {
+        position: fixed;
+        width: 10px;
+        height: 10px;
+        border: 1.5px solid var(--neon);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 9999;
+        transform: translate(-50%, -50%);
+        mix-blend-mode: screen;
+      }
+      #cursor::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: var(--neon);
+        border-radius: 50%;
+        transform: scale(0.3);
+      }
+
+      /* bg texture */
+      .grid-bg {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        background-image:
+          linear-gradient(rgba(154, 255, 0, 0.025) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(154, 255, 0, 0.025) 1px, transparent 1px);
+        background-size: 64px 64px;
+      }
+      .scanlines {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+        background: repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 3px,
+          rgba(0, 0, 0, 0.06) 3px,
+          rgba(0, 0, 0, 0.06) 4px
+        );
+      }
+
+      /* loading */
+      #loading {
+        position: fixed;
+        inset: 0;
+        background: var(--bg);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 200;
+        transition: opacity 0.6s;
+      }
+      #loading.out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .ll {
+        font-size: 10px;
+        letter-spacing: 0.5em;
+        color: rgba(255, 255, 255, 0.3);
+        text-transform: uppercase;
+      }
+      .lb-wrap {
+        width: 240px;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.1);
+        margin-top: 20px;
+        overflow: hidden;
+      }
+      #lbar {
+        height: 100%;
+        background: var(--neon);
+        width: 0%;
+        transition: width 0.3s;
+        box-shadow: 0 0 8px var(--neon);
+      }
+      .ls {
+        font-size: 9px;
+        letter-spacing: 0.4em;
+        color: rgba(255, 255, 255, 0.2);
+        margin-top: 10px;
+        text-transform: uppercase;
+      }
+
+      /* intro */
+      #intro {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        transition:
+          opacity 0.7s,
+          transform 0.7s;
+      }
+      #intro.out {
+        opacity: 0;
+        transform: scale(1.04);
+        pointer-events: none;
+      }
+      .logo-t {
+        font-family: var(--ui);
+        font-size: clamp(52px, 10vw, 100px);
+        font-weight: 700;
+        letter-spacing: 0.35em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+      .logo-t em {
+        color: var(--neon);
+        font-style: normal;
+        text-shadow:
+          0 0 30px var(--neon30),
+          0 0 80px rgba(154, 255, 0, 0.1);
+      }
+      .logo-s {
+        font-size: 10px;
+        letter-spacing: 0.55em;
+        color: rgba(255, 255, 255, 0.25);
+        margin-top: 10px;
+        text-align: center;
+        text-transform: uppercase;
+      }
+      .specs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin: 36px 0;
+        width: min(560px, 85vw);
+      }
+      .spec {
+        border: 1px solid rgba(154, 255, 0, 0.15);
+        padding: 12px 14px;
+        text-align: center;
+        background: var(--neon05);
+      }
+      .sv {
+        font-family: var(--ui);
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--neon);
+        display: block;
+      }
+      .sl {
+        font-size: 8px;
+        letter-spacing: 0.35em;
+        color: rgba(255, 255, 255, 0.3);
+        text-transform: uppercase;
+      }
+      .diff-row {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+      .diff-btn {
+        background: none;
+        border: 1px solid rgba(154, 255, 0, 0.25);
+        color: rgba(255, 255, 255, 0.4);
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.3em;
+        padding: 9px 22px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-transform: uppercase;
+      }
+      .diff-btn:hover,
+      .diff-btn.sel {
+        border-color: var(--neon);
+        color: var(--neon);
+        background: var(--neon05);
+      }
+      .cta {
+        position: relative;
+        background: none;
+        border: 1.5px solid var(--neon);
+        color: var(--neon);
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: 0.45em;
+        padding: 16px 52px;
+        cursor: pointer;
+        text-transform: uppercase;
+        overflow: hidden;
+        transition: color 0.25s;
+      }
+      .cta::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: var(--neon);
+        transform: translateX(-100%);
+        transition: transform 0.25s;
+        z-index: -1;
+      }
+      .cta:hover::before {
+        transform: translateX(0);
+      }
+      .cta:hover {
+        color: var(--bg);
+      }
+      .cc {
+        position: absolute;
+        width: 14px;
+        height: 14px;
+      }
+      .cc.tl {
+        top: -1px;
+        left: -1px;
+        border-top: 2px solid var(--neon);
+        border-left: 2px solid var(--neon);
+      }
+      .cc.tr {
+        top: -1px;
+        right: -1px;
+        border-top: 2px solid var(--neon);
+        border-right: 2px solid var(--neon);
+      }
+      .cc.bl {
+        bottom: -1px;
+        left: -1px;
+        border-bottom: 2px solid var(--neon);
+        border-left: 2px solid var(--neon);
+      }
+      .cc.br {
+        bottom: -1px;
+        right: -1px;
+        border-bottom: 2px solid var(--neon);
+        border-right: 2px solid var(--neon);
+      }
+
+      /* app */
+      #app {
+        position: fixed;
+        inset: 0;
+        display: none;
+      }
+      #app.on {
+        display: block;
+      }
+      video#cam {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1);
+      }
+      canvas#ov {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      canvas#pc {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: none;
+      }
+      .vignette {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse at center,
+          transparent 35%,
+          rgba(0, 0, 0, 0.75) 100%
+        );
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      /* capture box */
+      #cbox {
+        position: absolute;
+        border: 1.5px solid var(--neon);
+        box-shadow:
+          0 0 16px var(--neon30),
+          inset 0 0 16px var(--neon05);
+        pointer-events: none;
+        z-index: 5;
+        display: none;
+      }
+      #cbox.on {
+        display: block;
+      }
+      #cbox::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 1.5px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--neon),
+          transparent
+        );
+        animation: scan 2.2s linear infinite;
+        opacity: 0.6;
+      }
+      @keyframes scan {
+        0% {
+          top: 0;
+        }
+        100% {
+          top: 100%;
+        }
+      }
+      #cbox .cb {
+        position: absolute;
+        width: 14px;
+        height: 14px;
+      }
+      #cbox .cb.tl {
+        top: -1px;
+        left: -1px;
+        border-top: 2.5px solid var(--neon);
+        border-left: 2.5px solid var(--neon);
+      }
+      #cbox .cb.tr {
+        top: -1px;
+        right: -1px;
+        border-top: 2.5px solid var(--neon);
+        border-right: 2.5px solid var(--neon);
+      }
+      #cbox .cb.bl {
+        bottom: -1px;
+        left: -1px;
+        border-bottom: 2.5px solid var(--neon);
+        border-left: 2.5px solid var(--neon);
+      }
+      #cbox .cb.br {
+        bottom: -1px;
+        right: -1px;
+        border-bottom: 2.5px solid var(--neon);
+        border-right: 2.5px solid var(--neon);
+      }
+      #clabel {
+        position: absolute;
+        bottom: -28px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 9px;
+        letter-spacing: 0.45em;
+        color: var(--neon);
+        text-transform: uppercase;
+        white-space: nowrap;
+        text-shadow: 0 0 10px var(--neon);
+        animation: labelPulse 1.4s ease-in-out infinite;
+      }
+      @keyframes labelPulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.45;
+        }
+      }
+
+      /* hud */
+      #hud {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 10;
+      }
+      .htl {
+        position: absolute;
+        top: 0;
+        left: 0;
+        padding: 22px 28px;
+      }
+      .htr {
+        position: absolute;
+        top: 0;
+        right: 0;
+        padding: 22px 28px;
+        text-align: right;
+      }
+      .hbl {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        padding: 22px 28px;
+      }
+      .hbr {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        padding: 22px 28px;
+        text-align: right;
+      }
+      .hud-title {
+        font-family: var(--ui);
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: 0.4em;
+        color: var(--neon);
+        text-shadow: 0 0 18px var(--neon30);
+        text-transform: uppercase;
+      }
+      .hud-title span {
+        color: rgba(255, 255, 255, 0.4);
+      }
+      .hand-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 5px;
+      }
+      .hdot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.18);
+        transition: background 0.2s;
+      }
+      .hdot.on {
+        background: var(--neon);
+        box-shadow: 0 0 4px var(--neon);
+      }
+      #hlabel {
+        font-size: 8px;
+        letter-spacing: 0.35em;
+        color: rgba(255, 255, 255, 0.3);
+        text-transform: uppercase;
+      }
+      .live-badge {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 8px;
+        letter-spacing: 0.4em;
+        color: rgba(255, 255, 255, 0.35);
+        text-transform: uppercase;
+      }
+      .live-dot {
+        width: 5px;
+        height: 5px;
+        background: var(--neon);
+        border-radius: 50%;
+        animation: blink 1.8s infinite;
+      }
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+      #fps-v {
+        font-size: 8px;
+        letter-spacing: 0.3em;
+        color: rgba(255, 255, 255, 0.2);
+        margin-top: 3px;
+      }
+      .iline {
+        font-size: 10px;
+        letter-spacing: 0.3em;
+        color: rgba(255, 255, 255, 0.4);
+        text-transform: uppercase;
+        line-height: 2.2;
+      }
+      .iline.hi {
+        color: var(--neon);
+        text-shadow: 0 0 8px var(--neon30);
+      }
+      #twrap {
+        display: none;
+      }
+      #twrap.on {
+        display: block;
+      }
+      .tlabel {
+        font-size: 8px;
+        letter-spacing: 0.45em;
+        color: rgba(255, 255, 255, 0.25);
+        text-transform: uppercase;
+        margin-bottom: 3px;
+      }
+      #tval {
+        font-family: var(--ui);
+        font-size: 42px;
+        font-weight: 300;
+        letter-spacing: 0.1em;
+      }
+      #cwrap {
+        display: none;
+        margin-top: 6px;
+      }
+      #cwrap.on {
+        display: block;
+      }
+      #cwrap .cl {
+        font-size: 9px;
+        letter-spacing: 0.3em;
+        color: rgba(255, 255, 255, 0.3);
+      }
+      #cwrap .cl span {
+        color: var(--neon);
+      }
+
+      /* pinch indicator */
+      #pi {
+        position: fixed;
+        pointer-events: none;
+        z-index: 20;
+        width: 30px;
+        height: 30px;
+        border: 1.5px solid rgba(154, 255, 0, 0.5);
+        border-radius: 50%;
+        display: none;
+        transform: translate(-50%, -50%);
+        transition:
+          transform 0.08s,
+          background 0.1s,
+          box-shadow 0.1s;
+      }
+      #pi.show {
+        display: block;
+      }
+      #pi.active {
+        background: rgba(154, 255, 0, 0.12);
+        box-shadow:
+          0 0 14px var(--neon),
+          0 0 28px var(--neon30);
+        transform: translate(-50%, -50%) scale(0.6);
+      }
+
+      /* flash */
+      #flash {
+        position: fixed;
+        inset: 0;
+        background: white;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 50;
+        transition: opacity 0.08s;
+      }
+      #flash.on {
+        opacity: 0.85;
+      }
+      #flash.off {
+        opacity: 0;
+        transition: opacity 0.35s;
+      }
+
+      /* complete */
+      #complete {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        z-index: 80;
+        background: rgba(0, 0, 0, 0.82);
+        backdrop-filter: blur(12px);
+      }
+      #complete.on {
+        display: flex;
+      }
+      .win-t {
+        font-family: var(--ui);
+        font-weight: 700;
+        font-size: clamp(38px, 8vw, 78px);
+        letter-spacing: 0.3em;
+        color: var(--neon);
+        text-transform: uppercase;
+        animation: gp 1.8s ease-in-out infinite;
+      }
+      @keyframes gp {
+        0%,
+        100% {
+          text-shadow: 0 0 40px var(--neon30);
+        }
+        50% {
+          text-shadow:
+            0 0 80px var(--neon),
+            0 0 160px var(--neon30);
+        }
+      }
+      .win-s {
+        font-size: 15px;
+        letter-spacing: 0.3em;
+        color: rgba(255, 255, 255, 0.5);
+        margin-top: 14px;
+      }
+      #retryBtn {
+        margin-top: 38px;
+        pointer-events: all;
+        background: none;
+        border: 1.5px solid rgba(255, 255, 255, 0.25);
+        color: rgba(255, 255, 255, 0.5);
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.4em;
+        padding: 13px 38px;
+        cursor: pointer;
+        text-transform: uppercase;
+        transition: all 0.25s;
+      }
+      #retryBtn:hover {
+        border-color: var(--neon);
+        color: var(--neon);
+      }
+
+      /* error */
+      #err {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(255, 59, 59, 0.08);
+        border: 1px solid var(--red);
+        padding: 22px 36px;
+        text-align: center;
+        z-index: 300;
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        color: var(--red);
+        max-width: 380px;
+        line-height: 1.8;
+      }
+      #err.on {
+        display: block;
+      }
+
+      /* particles */
+      .sp {
+        position: fixed;
+        pointer-events: none;
+        z-index: 25;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--neon);
+        box-shadow: 0 0 6px var(--neon);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid-bg"></div>
+    <div class="scanlines"></div>
+    <div id="cursor"></div>
+    <div id="flash"></div>
+
+    <!-- Loading -->
+    <div id="loading">
+      <div class="ll">LIVE PUZZLE</div>
+      <div class="lb-wrap"><div id="lbar"></div></div>
+      <div class="ls" id="lsub">Initializing…</div>
+    </div>
+
+    <!-- Error -->
+    <div id="err"></div>
+
+    <!-- Intro -->
+    <div id="intro">
+      <div>
+        <div class="logo-t">LIVE <em>PUZZLE</em></div>
+        <div class="logo-s">Hand-Tracked · Real-Time · Gesture Controlled</div>
+      </div>
+      <div class="specs">
+        <div class="spec">
+          <span class="sv">30+</span><span class="sl">FPS Target</span>
+        </div>
+        <div class="spec">
+          <span class="sv">21</span><span class="sl">Landmarks</span>
+        </div>
+        <div class="spec">
+          <span class="sv" id="sg">3×3</span><span class="sl">Puzzle Grid</span>
+        </div>
+      </div>
+      <div class="diff-row">
+        <button class="diff-btn sel" data-g="3">3×3 EASY</button>
+        <button class="diff-btn" data-g="4">4×4 HARD</button>
+      </div>
+      <button class="cta" id="startBtn">
+        <div class="cc tl"></div>
+        <div class="cc tr"></div>
+        <div class="cc bl"></div>
+        <div class="cc br"></div>
+        INITIALIZE CAMERA
+      </button>
+    </div>
+
+    <!-- App -->
+    <div id="app">
+      <video id="cam" autoplay playsinline muted></video>
+      <canvas id="ov"></canvas>
+      <canvas id="pc"></canvas>
+      <div class="vignette"></div>
+      <div id="cbox">
+        <div class="cb tl"></div>
+        <div class="cb tr"></div>
+        <div class="cb bl"></div>
+        <div class="cb br"></div>
+        <div id="clabel">PINCH TO CAPTURE</div>
+      </div>
+      <div id="pi"></div>
+      <div id="hud">
+        <div class="htl">
+          <div class="hud-title">LIVE <span>PUZZLE</span></div>
+          <div class="hand-row">
+            <div class="hdot" id="hd1"></div>
+            <div class="hdot" id="hd2"></div>
+            <div id="hlabel">NO HANDS</div>
+          </div>
+        </div>
+        <div class="htr">
+          <div class="live-badge">
+            <div class="live-dot"></div>
+            CAM ACTIVE
+          </div>
+          <div id="fps-v">-- FPS</div>
+        </div>
+        <div class="hbl">
+          <div class="iline hi" id="i1">FRAME IT TO SNAP</div>
+          <div class="iline" id="i2" style="display: none">RELEASE TO DROP</div>
+        </div>
+        <div class="hbr">
+          <div id="cwrap">
+            <div class="cl">
+              <span id="placed">0</span>&nbsp;/&nbsp;<span id="total">9</span
+              >&nbsp;PLACED
+            </div>
+          </div>
+          <div id="twrap">
+            <div class="tlabel">ELAPSED</div>
+            <div id="tval">00:00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Complete -->
+    <div id="complete">
+      <div class="win-t">PUZZLE COMPLETE</div>
+      <div class="win-s">Solved in <span id="wtime">--:--</span></div>
+      <button id="retryBtn">↩ NEW PUZZLE</button>
+    </div>
+
+    <script>
+      /* ═══════════════════════════════════════════
+   LIVE PUZZLE  v2.0
+   ═══════════════════════════════════════════ */
+
+      const $ = (id) => document.getElementById(id);
+      const OVC = $("ov"),
+        PC = $("pc");
+      const OVX = OVC.getContext("2d"),
+        PCX = PC.getContext("2d");
+
+      // ── State ──
+      const S = {
+        mode: "intro",
+        grid: 3,
+        pieces: [],
+        dragging: null,
+        dragOX: 0,
+        dragOY: 0,
+        pinching: false,
+        wasPinch: false,
+        pinchPos: { x: 0, y: 0 },
+        handsN: 0,
+        timer: 0,
+        timerRef: null,
+        timerStart: 0,
+        done: false,
+        fps: 0,
+        _ft: performance.now(),
+        _fc: 0,
+        captureReady: false,
+        useMouse: false,
+      };
+
+      // ── Utils ──
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const dist = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1);
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+      const fmt = (s) =>
+        `${Math.floor(s / 60)
+          .toString()
+          .padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+
+      // ── Resize ──
+      function resize() {
+        OVC.width = window.innerWidth;
+        OVC.height = window.innerHeight;
+        PC.width = window.innerWidth;
+        PC.height = window.innerHeight;
+        layoutBox();
+        if (S.mode === "puzzle" && S.pieces.length) recalcTargets();
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      // ── Cursor ──
+      document.addEventListener("mousemove", (e) => {
+        $("cursor").style.cssText = `left:${e.clientX}px;top:${e.clientY}px`;
+      });
+
+      // ── Load bar ──
+      function setLoad(p, t) {
+        $("lbar").style.width = p + "%";
+        if (t) $("lsub").textContent = t;
+      }
+
+      // ── Diff buttons ──
+      document.querySelectorAll(".diff-btn").forEach((b) => {
+        b.addEventListener("click", () => {
+          document
+            .querySelectorAll(".diff-btn")
+            .forEach((x) => x.classList.remove("sel"));
+          b.classList.add("sel");
+          S.grid = parseInt(b.dataset.g);
+          $("sg").textContent = S.grid + "×" + S.grid;
+          $("total").textContent = S.grid * S.grid;
+        });
+      });
+      $("total").textContent = S.grid * S.grid;
+
+      // ── Buttons ──
+      $("startBtn").addEventListener("click", beginCamera);
+      $("retryBtn").addEventListener("click", () => {
+        $("complete").classList.remove("on");
+        resetToCamera();
+      });
+
+      /* ══════════════════
+   LOAD MEDIAPIPE
+   ══════════════════ */
+      function loadScript(src, ok, fail) {
+        const s = document.createElement("script");
+        s.src = src;
+        s.onload = ok;
+        s.onerror = fail;
+        document.head.appendChild(s);
+      }
+
+      let mpHands = null,
+        mpCam = null;
+      let _lastSend = 0;
+
+      function loadMP(done) {
+        setLoad(30, "Loading MediaPipe…");
+        loadScript(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js",
+          () => {
+            setLoad(60, "Loading camera utils…");
+            loadScript(
+              "https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js",
+              () => done(true),
+              () => done(true), // camera_utils optional
+            );
+          },
+          () => done(false),
+        );
+      }
+
+      /* ══════════════════
+   CAMERA START
+   ══════════════════ */
+      function beginCamera() {
+        $("intro").classList.add("out");
+        setTimeout(() => ($("intro").style.display = "none"), 700);
+        $("app").classList.add("on");
+        setLoad(10, "Requesting camera…");
+
+        navigator.mediaDevices
+          .getUserMedia({
+            video: {
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              facingMode: "user",
+            },
+            audio: false,
+          })
+          .then((stream) => {
+            const v = $("cam");
+            v.srcObject = stream;
+            v.onloadedmetadata = () => {
+              v.play();
+              setLoad(25, "Camera active…");
+              loadMP((ok) => {
+                if (ok && typeof Hands !== "undefined") {
+                  startMP();
+                } else {
+                  S.useMouse = true;
+                  setLoad(100, "Mouse mode active");
+                  setTimeout(() => $("loading").classList.add("out"), 500);
+                  initMouse();
+                  startCameraMode();
+                }
+              });
+            };
+          })
+          .catch(() =>
+            showErr(
+              "Camera access denied.<br><br>Allow camera permissions and reload.",
+            ),
+          );
+      }
+
+      /* ══════════════════
+   MEDIAPIPE
+   ══════════════════ */
+      function startMP() {
+        mpHands = new Hands({
+          locateFile: (f) =>
+            `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}`,
+        });
+        mpHands.setOptions({
+          maxNumHands: 2,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.7,
+          minTrackingConfidence: 0.6,
+        });
+        mpHands.onResults(onResults);
+        setLoad(90, "Warming up detector…");
+
+        if (typeof Camera !== "undefined") {
+          mpCam = new Camera($("cam"), {
+            onFrame: async () => {
+              try {
+                await mpHands.send({ image: $("cam") });
+              } catch (e) {}
+            },
+            width: 1280,
+            height: 720,
+          });
+          mpCam
+            .start()
+            .then(() => {
+              setLoad(100, "Ready");
+              setTimeout(() => {
+                $("loading").classList.add("out");
+                startCameraMode();
+              }, 400);
+            })
+            .catch(() => mpLoop());
+        } else {
+          mpLoop();
+        }
+      }
+
+      function mpLoop() {
+        setLoad(100, "Ready");
+        setTimeout(() => $("loading").classList.add("out"), 400);
+        startCameraMode();
+        async function loop(ts) {
+          tFPS(ts);
+          if (ts - _lastSend > 33) {
+            _lastSend = ts;
+            try {
+              await mpHands.send({ image: $("cam") });
+            } catch (e) {}
+          }
+          requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+      }
+
+      function tFPS(ts) {
+        S._fc++;
+        if (ts - S._ft > 1000) {
+          S.fps = Math.round((S._fc * 1000) / (ts - S._ft));
+          $("fps-v").textContent = S.fps + " FPS";
+          S._fc = 0;
+          S._ft = ts;
+        }
+      }
+
+      /* ══════════════════
+   HAND RESULTS
+   ══════════════════ */
+      const BONES = [
+        [0, 1],
+        [1, 2],
+        [2, 3],
+        [3, 4],
+        [0, 5],
+        [5, 6],
+        [6, 7],
+        [7, 8],
+        [0, 9],
+        [9, 10],
+        [10, 11],
+        [11, 12],
+        [0, 13],
+        [13, 14],
+        [14, 15],
+        [15, 16],
+        [0, 17],
+        [17, 18],
+        [18, 19],
+        [19, 20],
+        [5, 9],
+        [9, 13],
+        [13, 17],
+      ];
+      const TIPS = new Set([4, 8, 12, 16, 20]);
+
+      function onResults(res) {
+        tFPS(performance.now());
+        OVX.clearRect(0, 0, OVC.width, OVC.height);
+        const la = res.multiHandLandmarks || [];
+        updateHandHUD(la.length);
+        if (!la.length) {
+          if (S.mode === "puzzle" && S.pinching) {
+            handleGesture(S.pinchPos.x, S.pinchPos.y, false);
+          }
+          S.pinching = false;
+          $("pi").classList.remove("show", "active");
+          return;
+        }
+        la.forEach((lms) => drawHand(lms));
+        // first hand gesture
+        const lms = la[0];
+        const W = OVC.width,
+          H = OVC.height;
+        const th = lms[4],
+          idx = lms[8];
+        const tx = (1 - th.x) * W,
+          ty = th.y * H;
+        const ix = (1 - idx.x) * W,
+          iy = idx.y * H;
+        const d = dist(tx, ty, ix, iy);
+        const thr = W * 0.042;
+        const pinch = d < thr;
+        const mid = { x: (tx + ix) / 2, y: (ty + iy) / 2 };
+        drawPinchRing(mid.x, mid.y, d, thr, pinch);
+        // indicator
+        const pi = $("pi");
+        pi.classList.add("show");
+        pi.style.left = mid.x + "px";
+        pi.style.top = mid.y + "px";
+        pi.classList.toggle("active", pinch);
+        const was = S.pinching;
+        S.pinching = pinch;
+        S.pinchPos = mid;
+        if (S.mode === "camera") {
+          if (pinch && !was && S.captureReady) doCapture();
+        } else if (S.mode === "puzzle") handleGesture(mid.x, mid.y, pinch);
+      }
+
+      function drawHand(lms) {
+        const W = OVC.width,
+          H = OVC.height;
+        const p = lms.map((l) => ({ x: (1 - l.x) * W, y: l.y * H }));
+        OVX.lineCap = "round";
+        OVX.lineJoin = "round";
+        BONES.forEach(([a, b]) => {
+          OVX.beginPath();
+          OVX.moveTo(p[a].x, p[a].y);
+          OVX.lineTo(p[b].x, p[b].y);
+          OVX.strokeStyle = "rgba(154,255,0,.12)";
+          OVX.lineWidth = 5;
+          OVX.stroke();
+          OVX.strokeStyle = "rgba(255,255,255,.55)";
+          OVX.lineWidth = 1.5;
+          OVX.stroke();
+        });
+        p.forEach((pt, i) => {
+          OVX.beginPath();
+          const r = TIPS.has(i) ? 6 : i === 0 ? 5 : 3.5;
+          OVX.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+          if (TIPS.has(i)) {
+            OVX.shadowBlur = 14;
+            OVX.shadowColor = "rgba(154,255,0,.6)";
+            OVX.fillStyle = "#9AFF00";
+          } else {
+            OVX.shadowBlur = 0;
+            OVX.fillStyle = "rgba(255,255,255,.85)";
+          }
+          OVX.fill();
+        });
+        OVX.shadowBlur = 0;
+      }
+
+      function drawPinchRing(mx, my, d, thr, pinch) {
+        const r = clamp(1 - d / thr, 0, 1);
+        OVX.beginPath();
+        OVX.arc(mx, my, 22, 0, Math.PI * 2);
+        OVX.strokeStyle = `rgba(154,255,0,${0.25 + r * 0.65})`;
+        OVX.lineWidth = 1.5;
+        if (pinch) {
+          OVX.shadowBlur = 18;
+          OVX.shadowColor = "rgba(154,255,0,.7)";
+        }
+        OVX.stroke();
+        OVX.shadowBlur = 0;
+        if (pinch) {
+          OVX.beginPath();
+          OVX.arc(mx, my, 5, 0, Math.PI * 2);
+          OVX.fillStyle = "#9AFF00";
+          OVX.shadowBlur = 10;
+          OVX.shadowColor = "#9AFF00";
+          OVX.fill();
+          OVX.shadowBlur = 0;
+        }
+      }
+
+      function updateHandHUD(n) {
+        S.handsN = n;
+        $("hd1").classList.toggle("on", n >= 1);
+        $("hd2").classList.toggle("on", n >= 2);
+        $("hlabel").textContent =
+          n === 0 ? "NO HANDS" : n === 1 ? "1 HAND" : "2 HANDS";
+      }
+
+      /* ══════════════════
+   MOUSE FALLBACK
+   ══════════════════ */
+      function initMouse() {
+        let md = false;
+        document.addEventListener("mousemove", (e) => {
+          const mx = e.clientX,
+            my = e.clientY;
+          S.pinchPos = { x: mx, y: my };
+          const pi = $("pi");
+          pi.classList.add("show");
+          pi.style.left = mx + "px";
+          pi.style.top = my + "px";
+          pi.classList.toggle("active", md);
+          if (S.mode === "puzzle") handleGesture(mx, my, md);
+          updateHandHUD(1);
+        });
+        document.addEventListener("mousedown", () => {
+          md = true;
+          S.pinching = true;
+          $("pi").classList.add("active");
+          const { x, y } = S.pinchPos;
+          if (S.mode === "camera" && S.captureReady) doCapture();
+          else if (S.mode === "puzzle") handleGesture(x, y, true);
+        });
+        document.addEventListener("mouseup", () => {
+          md = false;
+          S.pinching = false;
+          $("pi").classList.remove("active");
+          if (S.mode === "puzzle") {
+            const { x, y } = S.pinchPos;
+            handleGesture(x, y, false);
+          }
+        });
+        let mRaf = 0;
+        function mLoop(ts) {
+          tFPS(ts);
+          OVX.clearRect(0, 0, OVC.width, OVC.height);
+          if (S.mode === "puzzle") renderPuzzle();
+          requestAnimationFrame(mLoop);
+        }
+        requestAnimationFrame(mLoop);
+      }
+
+      /* ══════════════════
+   CAMERA MODE
+   ══════════════════ */
+      function startCameraMode() {
+        S.mode = "camera";
+        S.done = false;
+        S.captureReady = false;
+        $("cbox").classList.remove("on");
+        PC.style.display = "none";
+        PCX.clearRect(0, 0, PC.width, PC.height);
+        layoutBox();
+        $("i1").textContent = "FRAME IT TO SNAP";
+        $("i1").classList.add("hi");
+        $("i2").style.display = "none";
+        $("twrap").classList.remove("on");
+        $("cwrap").classList.remove("on");
+        $("pi").classList.remove("show", "active");
+        setTimeout(() => {
+          $("cbox").classList.add("on");
+          S.captureReady = true;
+        }, 300);
+      }
+
+      function layoutBox() {
+        const W = window.innerWidth,
+          H = window.innerHeight;
+        const bw = Math.min(W, H) * 0.56,
+          bh = bw * 0.74;
+        Object.assign($("cbox").style, {
+          width: bw + "px",
+          height: bh + "px",
+          left: W / 2 - bw / 2 + "px",
+          top: H / 2 - bh / 2 + "px",
+        });
+      }
+
+      function resetToCamera() {
+        clearInterval(S.timerRef);
+        S.pieces = [];
+        S.dragging = null;
+        PC.style.display = "none";
+        PCX.clearRect(0, 0, PC.width, PC.height);
+        startCameraMode();
+      }
+
+      /* ══════════════════
+   CAPTURE
+   ══════════════════ */
+      let _capGuard = false;
+      function doCapture() {
+        if (_capGuard) return;
+        _capGuard = true;
+        S.captureReady = false;
+        // Flash effect
+        const fl = $("flash");
+        fl.classList.add("on");
+        setTimeout(() => {
+          fl.classList.remove("on");
+          fl.classList.add("off");
+        }, 100);
+        setTimeout(() => fl.classList.remove("off"), 500);
+        // Snapshot
+        const W = window.innerWidth,
+          H = window.innerHeight;
+        const tmp = document.createElement("canvas");
+        tmp.width = W;
+        tmp.height = H;
+        const tc = tmp.getContext("2d");
+        tc.save();
+        tc.translate(W, 0);
+        tc.scale(-1, 1);
+        tc.drawImage($("cam"), 0, 0, W, H);
+        tc.restore();
+        const bw = Math.min(W, H) * 0.56,
+          bh = bw * 0.74;
+        const bx = W / 2 - bw / 2,
+          by = H / 2 - bh / 2;
+        const src = document.createElement("canvas");
+        src.width = bw;
+        src.height = bh;
+        src.getContext("2d").drawImage(tmp, bx, by, bw, bh, 0, 0, bw, bh);
+        setTimeout(() => {
+          $("cbox").classList.remove("on");
+          buildPuzzle(src, bx, by, bw, bh);
+          _capGuard = false;
+        }, 180);
+      }
+
+      /* ══════════════════
+   PUZZLE BUILD
+   ══════════════════ */
+      function buildPuzzle(src, bx, by, bw, bh) {
+        S.mode = "puzzle";
+        const N = S.grid,
+          pw = bw / N,
+          ph = bh / N;
+        const correct = [];
+        for (let r = 0; r < N; r++)
+          for (let c = 0; c < N; c++) correct.push({ r, c });
+        const order = [...correct].sort(() => Math.random() - 0.5);
+        S.pieces = correct.map((pos, i) => {
+          const sl = order[i];
+          return {
+            r: pos.r,
+            c: pos.c,
+            x: bx + sl.c * pw + (Math.random() - 0.5) * pw * 0.2,
+            y: by + sl.r * ph + (Math.random() - 0.5) * ph * 0.2,
+            tx: bx + pos.c * pw,
+            ty: by + pos.r * ph,
+            w: pw,
+            h: ph,
+            sx: pos.c * pw,
+            sy: pos.r * ph,
+            src,
+            placed: false,
+          };
+        });
+        PC.style.display = "block";
+        $("i1").textContent = "PINCH & DRAG TO SWAP";
+        $("i1").classList.remove("hi");
+        $("i2").textContent = "RELEASE TO DROP";
+        $("i2").style.display = "block";
+        $("total").textContent = N * N;
+        $("placed").textContent = "0";
+        $("cwrap").classList.add("on");
+        $("twrap").classList.add("on");
+        S.timer = 0;
+        S.timerStart = Date.now();
+        clearInterval(S.timerRef);
+        S.timerRef = setInterval(() => {
+          S.timer = Math.floor((Date.now() - S.timerStart) / 1000);
+          $("tval").textContent = fmt(S.timer);
+        }, 500);
+        pRenderLoop();
+      }
+
+      /* ══════════════════
+   PUZZLE RENDER
+   ══════════════════ */
+      let _praf = null;
+      function pRenderLoop() {
+        function f(ts) {
+          if (S.mode !== "puzzle") {
+            _praf = null;
+            return;
+          }
+          renderPuzzle();
+          _praf = requestAnimationFrame(f);
+        }
+        if (!_praf) _praf = requestAnimationFrame(f);
+      }
+
+      function renderPuzzle() {
+        PCX.clearRect(0, 0, PC.width, PC.height);
+        drawGrid();
+        // sort order: placed < unplaced < dragging
+        const idx = [...S.pieces.keys()].sort((a, b) => {
+          if (a === S.dragging) return 1;
+          if (b === S.dragging) return -1;
+          if (S.pieces[a].placed && !S.pieces[b].placed) return -1;
+          if (!S.pieces[a].placed && S.pieces[b].placed) return 1;
+          return 0;
+        });
+        idx.forEach((i) => drawPiece(i, i === S.dragging));
+      }
+
+      function drawGrid() {
+        if (!S.pieces.length) return;
+        const N = S.grid,
+          pw = S.pieces[0].w,
+          ph = S.pieces[0].h;
+        const bx = S.pieces[0].tx - S.pieces[0].c * pw;
+        const by = S.pieces[0].ty - S.pieces[0].r * ph;
+        PCX.save();
+        PCX.strokeStyle = "rgba(154,255,0,.08)";
+        PCX.lineWidth = 1;
+        for (let r = 0; r <= N; r++) {
+          PCX.beginPath();
+          PCX.moveTo(bx, by + r * ph);
+          PCX.lineTo(bx + N * pw, by + r * ph);
+          PCX.stroke();
+        }
+        for (let c = 0; c <= N; c++) {
+          PCX.beginPath();
+          PCX.moveTo(bx + c * pw, by);
+          PCX.lineTo(bx + c * pw, by + N * ph);
+          PCX.stroke();
+        }
+        PCX.restore();
+      }
+
+      function drawPiece(i, drag) {
+        const p = S.pieces[i];
+        PCX.save();
+        if (drag) {
+          PCX.shadowBlur = 24;
+          PCX.shadowColor = "rgba(154,255,0,.5)";
+        } else if (!p.placed) {
+          PCX.shadowBlur = 10;
+          PCX.shadowColor = "rgba(0,0,0,.55)";
+        }
+        PCX.drawImage(p.src, p.sx, p.sy, p.w, p.h, p.x, p.y, p.w, p.h);
+        PCX.shadowBlur = 0;
+        if (drag) {
+          PCX.strokeStyle = "#9AFF00";
+          PCX.lineWidth = 2;
+          PCX.shadowBlur = 12;
+          PCX.shadowColor = "#9AFF00";
+        } else if (p.placed) {
+          PCX.strokeStyle = "rgba(154,255,0,.3)";
+          PCX.lineWidth = 0.8;
+        } else {
+          PCX.strokeStyle = "rgba(255,255,255,.18)";
+          PCX.lineWidth = 0.8;
+        }
+        PCX.strokeRect(p.x, p.y, p.w, p.h);
+        PCX.shadowBlur = 0;
+        if (p.placed && !drag) {
+          PCX.fillStyle = "rgba(154,255,0,.06)";
+          PCX.fillRect(p.x, p.y, p.w, p.h);
+        }
+        PCX.restore();
+      }
+
+      /* ══════════════════
+   GESTURE HANDLER
+   ══════════════════ */
+      function handleGesture(px, py, pinch) {
+        const was = S.wasPinch;
+        S.wasPinch = pinch;
+        const press = pinch && !was;
+        const rel = !pinch && was;
+        if (press) {
+          // pick up top unplaced piece
+          for (let i = S.pieces.length - 1; i >= 0; i--) {
+            const p = S.pieces[i];
+            if (p.placed) continue;
+            if (px >= p.x && px <= p.x + p.w && py >= p.y && py <= p.y + p.h) {
+              S.dragging = i;
+              S.dragOX = px - p.x;
+              S.dragOY = py - p.y;
+              break;
+            }
+          }
+        }
+        if (pinch && S.dragging !== null) {
+          const p = S.pieces[S.dragging];
+          p.x = px - S.dragOX;
+          p.y = py - S.dragOY;
+        }
+        if (rel && S.dragging !== null) {
+          const p = S.pieces[S.dragging];
+          const snap = Math.min(p.w, p.h) * 0.33;
+          if (dist(p.x, p.y, p.tx, p.ty) < snap) snapPiece(S.dragging);
+          S.dragging = null;
+        }
+      }
+
+      /* ══════════════════
+   SNAP ANIMATION
+   ══════════════════ */
+      function snapPiece(idx) {
+        const p = S.pieces[idx];
+        const sx = p.x,
+          sy = p.y,
+          ex = p.tx,
+          ey = p.ty;
+        const t0 = performance.now(),
+          dur = 140;
+        function a(now) {
+          const t = clamp((now - t0) / dur, 0, 1);
+          const e = 1 - Math.pow(1 - t, 3);
+          p.x = lerp(sx, ex, e);
+          p.y = lerp(sy, ey, e);
+          if (t < 1) {
+            requestAnimationFrame(a);
+          } else {
+            p.x = ex;
+            p.y = ey;
+            p.placed = true;
+            burst(ex + p.w / 2, ey + p.h / 2);
+            playSnap();
+            const n = S.pieces.filter((x) => x.placed).length;
+            $("placed").textContent = n;
+            if (n === S.pieces.length && !S.done) onComplete();
+          }
+        }
+        requestAnimationFrame(a);
+      }
+
+      /* ══════════════════
+   RECALC ON RESIZE
+   ══════════════════ */
+      function recalcTargets() {
+        if (!S.pieces.length) return;
+        const W = window.innerWidth,
+          H = window.innerHeight;
+        const N = S.grid,
+          bw = Math.min(W, H) * 0.56,
+          bh = bw * 0.74;
+        const bx = W / 2 - bw / 2,
+          by = H / 2 - bh / 2;
+        const pw = bw / N,
+          ph = bh / N;
+        // scale source canvas
+        const ns = document.createElement("canvas");
+        ns.width = bw;
+        ns.height = bh;
+        ns.getContext("2d").drawImage(S.pieces[0].src, 0, 0, bw, bh);
+        S.pieces.forEach((p) => {
+          const otx = p.tx,
+            oty = p.ty;
+          p.w = pw;
+          p.h = ph;
+          p.src = ns;
+          p.sx = p.c * pw;
+          p.sy = p.r * ph;
+          p.tx = bx + p.c * pw;
+          p.ty = by + p.r * ph;
+          if (p.placed) {
+            p.x = p.tx;
+            p.y = p.ty;
+          } else {
+            p.x += p.tx - otx;
+            p.y += p.ty - oty;
+          }
+        });
+      }
+
+      /* ══════════════════
+   PARTICLES
+   ══════════════════ */
+      function burst(cx, cy) {
+        for (let i = 0; i < 8; i++) {
+          const el = document.createElement("div");
+          el.className = "sp";
+          document.body.appendChild(el);
+          const angle = (i / 8) * Math.PI * 2;
+          const spd = 40 + Math.random() * 55;
+          const dx = Math.cos(angle) * spd,
+            dy = Math.sin(angle) * spd;
+          el.style.cssText = `left:${cx}px;top:${cy}px;transform:translate(-50%,-50%)`;
+          const t0 = performance.now(),
+            dur = 500 + Math.random() * 200;
+          function tick(ts) {
+            const t = clamp((ts - t0) / dur, 0, 1);
+            const e = 1 - Math.pow(1 - t, 2);
+            el.style.transform = `translate(calc(-50% + ${dx * e}px),calc(-50% + ${dy * e}px))`;
+            el.style.opacity = 1 - t;
+            t < 1 ? requestAnimationFrame(tick) : el.remove();
+          }
+          requestAnimationFrame(tick);
+        }
+      }
+
+      /* ══════════════════
+   COMPLETE
+   ══════════════════ */
+      function onComplete() {
+        S.done = true;
+        clearInterval(S.timerRef);
+        setTimeout(() => {
+          $("wtime").textContent = fmt(S.timer);
+          $("complete").classList.add("on");
+          playWin();
+        }, 500);
+      }
+
+      /* ══════════════════
+   AUDIO
+   ══════════════════ */
+      let actx = null;
+      function ac() {
+        if (!actx)
+          actx = new (window.AudioContext || window.webkitAudioContext)();
+        return actx;
+      }
+
+      function playSnap() {
+        try {
+          const c = ac(),
+            o = c.createOscillator(),
+            g = c.createGain();
+          o.connect(g);
+          g.connect(c.destination);
+          o.type = "sine";
+          o.frequency.setValueAtTime(520, c.currentTime);
+          o.frequency.exponentialRampToValueAtTime(980, c.currentTime + 0.07);
+          g.gain.setValueAtTime(0.18, c.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.14);
+          o.start();
+          o.stop(c.currentTime + 0.15);
+        } catch (e) {}
+      }
+
+      function playWin() {
+        try {
+          const c = ac();
+          [440, 554, 659, 880].forEach((f, i) => {
+            const o = c.createOscillator(),
+              g = c.createGain();
+            o.connect(g);
+            g.connect(c.destination);
+            o.type = "sine";
+            o.frequency.value = f;
+            const d = i * 0.1;
+            g.gain.setValueAtTime(0.12, c.currentTime + d);
+            g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + d + 0.4);
+            o.start(c.currentTime + d);
+            o.stop(c.currentTime + d + 0.45);
+          });
+        } catch (e) {}
+      }
+
+      /* ══════════════════
+   ERROR
+   ══════════════════ */
+      function showErr(msg) {
+        const el = $("err");
+        el.innerHTML = msg;
+        el.classList.add("on");
+        $("loading").classList.add("out");
+      }
+
+      console.log(
+        "%cLIVE PUZZLE v2 ready",
+        "background:#9AFF00;color:#000;font-family:monospace;padding:4px 10px;font-weight:bold",
+      );
+    </script>
+  </body>
+</html>

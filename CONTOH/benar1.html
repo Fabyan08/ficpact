@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Missing Letter in the Forest</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root {
+            --wood-primary: #8D6E63;
+            --wood-light: #D7CCC8;
+            --wood-dark: #5D4037;
+            --leaf-light: #C8E6C9;
+            --leaf-dark: #2E7D32;
+        }
+
+        body {
+            font-family: 'Fredoka', sans-serif;
+            overflow: hidden;
+            background-color: #E8F5E9; /* Light green bg */
+            user-select: none;
+        }
+
+        /* Wood Texture Effect */
+        .wood-panel {
+            background-color: var(--wood-primary);
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.05) 10px, rgba(0,0,0,0.05) 20px);
+            border: 4px solid var(--wood-dark);
+            border-radius: 20px;
+            box-shadow: 0 10px 0 var(--wood-dark);
+        }
+
+        /* Leaf Button */
+        .leaf-btn {
+            background: linear-gradient(180deg, #66BB6A 0%, #43A047 100%);
+            border: 4px solid #1B5E20;
+            border-radius: 50px; /* Leaf shape-ish */
+            box-shadow: 0 8px 0 #1B5E20, 0 15px 20px rgba(0,0,0,0.2);
+            transition: transform 0.2s, filter 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .leaf-btn::after {
+            content: '';
+            position: absolute;
+            top: 10%;
+            left: 20%;
+            width: 20%;
+            height: 15%;
+            background: rgba(255,255,255,0.4);
+            border-radius: 50%;
+        }
+
+        .leaf-btn.hovered {
+            transform: scale(1.1) translateY(-5px);
+            filter: brightness(1.2);
+        }
+
+        .leaf-btn.wrong {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+            background: linear-gradient(180deg, #EF5350 0%, #C62828 100%);
+            border-color: #B71C1C;
+            box-shadow: 0 8px 0 #B71C1C;
+        }
+
+        .leaf-btn.correct {
+            background: linear-gradient(180deg, #29B6F6 0%, #0288D1 100%);
+            border-color: #01579B;
+            box-shadow: 0 8px 0 #01579B;
+            animation: bounce 0.6s infinite alternate;
+        }
+
+        /* Animations */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-8px, 0, 0); }
+            40%, 60% { transform: translate3d(8px, 0, 0); }
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-10px); }
+        }
+
+        .floating-element {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .pop-in {
+            animation: popIn 0.5s ease-out forwards;
+        }
+
+        /* Cursor / Hand Tracking Overlay */
+        #cursor {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border: 4px solid white;
+            border-radius: 50%;
+            background: rgba(255, 193, 7, 0.4);
+            pointer-events: none;
+            z-index: 100;
+            transform: translate(-50%, -50%);
+            display: none;
+            box-shadow: 0 0 20px rgba(255, 193, 7, 0.8);
+            transition: left 0.1s linear, top 0.1s linear; /* Smooth movement */
+        }
+
+        #cursor-progress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 6px solid #FFEB3B;
+            border-top-color: transparent;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .cursor-loading #cursor-progress {
+            opacity: 1;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Progress Bar */
+        .xp-bar-container {
+            background: rgba(0,0,0,0.2);
+            border-radius: 99px;
+            overflow: hidden;
+            height: 24px;
+            border: 2px solid white;
+        }
+        .xp-fill {
+            background: linear-gradient(90deg, #FDD835, #FBC02D);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Character */
+        .mascot {
+            transition: transform 0.3s;
+        }
+        .mascot.happy {
+            animation: bounce 0.4s infinite alternate;
+        }
+
+    </style>
+</head>
+<body class="h-screen w-screen relative bg-gradient-to-b from-blue-200 via-green-100 to-green-200">
+
+    <!-- Background Elements -->
+    <div class="absolute bottom-0 left-0 w-full pointer-events-none">
+        <svg viewBox="0 0 1440 320" class="w-full opacity-60">
+            <path fill="#81C784" fill-opacity="1" d="M0,224L48,213.3C96,203,192,181,288,181.3C384,181,480,203,576,224C672,245,768,267,864,250.7C960,235,1056,181,1152,165.3C1248,149,1344,171,1392,181.3L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+        </svg>
+    </div>
+    
+    <!-- Virtual Cursor -->
+    <div id="cursor">
+        <div id="cursor-progress"></div>
+    </div>
+
+    <!-- UI Overlay: Loading / Start Screen -->
+    <div id="start-screen" class="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-3xl text-center max-w-lg shadow-2xl border-8 border-green-500 pop-in">
+            <div class="text-6xl mb-4">🌳</div>
+            <h1 class="text-4xl font-bold text-green-700 mb-2">Forest Word Hunt!</h1>
+            <p class="text-gray-600 text-xl mb-6">Learn letters with magic gestures.</p>
+            
+            <div id="loading-text" class="text-lg text-blue-500 font-bold mb-4 animate-pulse">
+                Loading Magic Hand Vision...
+            </div>
+            
+            <button id="start-btn" disabled class="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-full text-2xl shadow-lg transform transition disabled:opacity-50 disabled:cursor-not-allowed">
+                Start Adventure! ▶
+            </button>
+            <p class="text-sm text-gray-400 mt-4">Requires Camera Access • Point to play</p>
+        </div>
+    </div>
+
+    <!-- Main Game Container -->
+    <div id="game-container" class="relative h-full w-full flex flex-col p-4 md:p-8 hidden">
+        
+        <!-- Top Bar -->
+        <div class="flex items-center justify-between w-full mb-4">
+            <!-- Profile -->
+            <div class="wood-panel px-4 py-2 flex items-center gap-3">
+                <div class="w-12 h-12 bg-yellow-200 rounded-full border-2 border-white flex items-center justify-center text-2xl shadow-inner">
+                    🦁
+                </div>
+                <div>
+                    <div class="text-white font-bold text-lg leading-none">Explorer</div>
+                    <div class="text-yellow-100 text-sm">Level <span id="level-display">1</span></div>
+                </div>
+            </div>
+
+            <!-- XP Bar -->
+            <div class="flex-1 max-w-md mx-4">
+                <div class="flex justify-between text-green-800 font-bold mb-1 px-2">
+                    <span>XP</span>
+                    <span id="xp-text">0 / 100</span>
+                </div>
+                <div class="xp-bar-container">
+                    <div id="xp-fill" class="xp-fill"></div>
+                </div>
+            </div>
+
+            <!-- Settings / Camera Preview -->
+            <div class="relative">
+                <div class="wood-panel p-1 w-32 h-24 overflow-hidden relative">
+                    <video id="webcam" class="absolute top-0 left-0 w-full h-full object-cover transform scale-x-[-1]" autoplay playsinline muted></video>
+                    <!-- Hand Overlay Canvas -->
+                    <canvas id="output_canvas" class="absolute top-0 left-0 w-full h-full transform scale-x-[-1]"></canvas>
+                </div>
+                <div class="absolute -bottom-3 right-0 bg-blue-500 text-white text-xs px-2 py-1 rounded-full shadow">
+                    📷 Hand Cam
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Stage -->
+        <div class="flex-1 flex flex-col items-center justify-center relative">
+            
+            <!-- Mascot Feedback -->
+            <div class="absolute top-0 right-10 hidden md:block mascot floating-element">
+                <div id="mascot-emoji" class="text-8xl filter drop-shadow-xl">🦉</div>
+                <div id="mascot-bubble" class="bg-white p-3 rounded-xl rounded-bl-none shadow-lg absolute -top-4 -left-32 w-32 text-center text-gray-700 font-bold opacity-0 transition-opacity">
+                    Pick a letter!
+                </div>
+            </div>
+
+            <!-- Word Card -->
+            <div class="bg-white/80 backdrop-blur-md p-8 rounded-[40px] shadow-2xl border-4 border-white flex flex-col items-center justify-center w-full max-w-3xl min-h-[300px] mb-8 relative">
+                
+                <!-- Floating Stars for Success -->
+                <div id="feedback-stars" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+
+                <!-- Object Image -->
+                <div id="word-image" class="text-9xl mb-6 filter drop-shadow-md floating-element transition-transform">
+                    🍎
+                </div>
+
+                <!-- The Word -->
+                <div class="flex gap-4 items-end mb-4">
+                    <div id="word-container" class="flex gap-2">
+                        <!-- Letters injected by JS -->
+                        <div class="text-6xl font-black text-gray-700 w-16 text-center">A</div>
+                        <div class="text-6xl font-black text-gray-700 w-16 text-center border-b-8 border-gray-300">_</div>
+                    </div>
+                </div>
+                
+                <div id="hint-text" class="text-gray-500 font-semibold text-xl mt-2">
+                    "Find the missing letter!"
+                </div>
+            </div>
+
+            <!-- Interaction Zone (Letters) -->
+            <div id="options-container" class="flex flex-wrap justify-center gap-6 md:gap-12 w-full max-w-4xl pb-4">
+                <!-- Option Buttons Injected by JS -->
+            </div>
+
+        </div>
+
+        <!-- Debug / Instruction Footer -->
+        <div class="text-center text-green-800 font-semibold opacity-60 text-sm">
+            👆 Point your finger at the correct letter and hold!
+        </div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script type="module">
+        import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js";
+
+        /**
+         * ------------------------------------------------------------------
+         * Game Configuration & State
+         * ------------------------------------------------------------------
+         */
+        const CONFIG = {
+            hoverDuration: 800, // ms to trigger selection
+            colors: {
+                neutral: '#D7CCC8',
+                hover: '#FFF59D',
+                selected: '#81C784'
+            },
+            speechEnabled: true
+        };
+
+        const STATE = {
+            level: 1,
+            xp: 0,
+            xpToNextLevel: 100,
+            currentWordIndex: 0,
+            isGameActive: false,
+            isCameraReady: false,
+            cursor: { x: 0, y: 0 },
+            hoverTargetId: null,
+            hoverStartTime: 0,
+            words: []
+        };
+
+        // Vocabulary Database
+        const VOCABULARY = [
+            { id: 1, word: "APPLE", missingIdx: 0, icon: "🍎", level: 1 }, // _PPLE
+            { id: 2, word: "BEAR", missingIdx: 0, icon: "🐻", level: 1 },  // _EAR
+            { id: 3, word: "CAT", missingIdx: 0, icon: "🐱", level: 1 },   // _AT
+            { id: 4, word: "DOG", missingIdx: 2, icon: "🐶", level: 1 },   // DO_
+            { id: 5, word: "EGG", missingIdx: 0, icon: "🥚", level: 1 },   // _GG
+            { id: 6, word: "FISH", missingIdx: 0, icon: "🐟", level: 1 },  // _ISH
+            { id: 7, word: "FROG", missingIdx: 3, icon: "🐸", level: 1 },  // FRO_
+            { id: 8, word: "BIRD", missingIdx: 1, icon: "🐦", level: 2 },  // B_RD
+            { id: 9, word: "TREE", missingIdx: 2, icon: "🌳", level: 2 },  // TR_E
+            { id: 10, word: "LION", missingIdx: 1, icon: "🦁", level: 2 }, // L_ON
+            { id: 11, word: "DUCK", missingIdx: 3, icon: "🦆", level: 2 }, // DUC_
+            { id: 12, word: "MILK", missingIdx: 2, icon: "🥛", level: 2 }, // MI_K
+        ];
+
+        // DOM Elements
+        const elStartScreen = document.getElementById('start-screen');
+        const elGameContainer = document.getElementById('game-container');
+        const elStartBtn = document.getElementById('start-btn');
+        const elLoadingText = document.getElementById('loading-text');
+        const elWebcam = document.getElementById('webcam');
+        const elCanvas = document.getElementById('output_canvas');
+        const elCursor = document.getElementById('cursor');
+        const elWordContainer = document.getElementById('word-container');
+        const elOptionsContainer = document.getElementById('options-container');
+        const elWordImage = document.getElementById('word-image');
+        const elXpFill = document.getElementById('xp-fill');
+        const elXpText = document.getElementById('xp-text');
+        const elLevelDisplay = document.getElementById('level-display');
+        const elMascotBubble = document.getElementById('mascot-bubble');
+        const elMascotEmoji = document.getElementById('mascot-emoji');
+
+        /**
+         * ------------------------------------------------------------------
+         * Audio System (TTS & SFX)
+         * ------------------------------------------------------------------
+         */
+        const speak = (text) => {
+            if (!CONFIG.speechEnabled || !window.speechSynthesis) return;
+            // Cancel any current speech
+            window.speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.9; // Slightly slower for kids
+            utterance.pitch = 1.1; // Cheerful pitch
+            utterance.volume = 1;
+            
+            // Try to find a friendly voice
+            const voices = window.speechSynthesis.getVoices();
+            const preferredVoice = voices.find(v => v.lang.includes('en') && (v.name.includes('Female') || v.name.includes('Samantha')));
+            if (preferredVoice) utterance.voice = preferredVoice;
+
+            window.speechSynthesis.speak(utterance);
+        };
+
+        const playSound = (type) => {
+            // Simple synth for sound effects to avoid external file deps
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            const now = ctx.currentTime;
+
+            if (type === 'hover') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'select') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(600, now);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'success') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(500, now);
+                osc.frequency.linearRampToValueAtTime(1000, now + 0.1);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+                osc.start(now);
+                osc.stop(now + 0.6);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        };
+
+        /**
+         * ------------------------------------------------------------------
+         * Logic: Game Flow
+         * ------------------------------------------------------------------
+         */
+        
+        function initGame() {
+            // Shuffle vocabulary
+            STATE.words = [...VOCABULARY].sort(() => Math.random() - 0.5);
+            STATE.currentWordIndex = 0;
+            updateXP(0);
+            loadNextLevel();
+            STATE.isGameActive = true;
+        }
+
+        function loadNextLevel() {
+            if (STATE.currentWordIndex >= STATE.words.length) {
+                // Restart with reshuffle if ran out of words
+                STATE.words = [...VOCABULARY].sort(() => Math.random() - 0.5);
+                STATE.currentWordIndex = 0;
+                STATE.level++;
+                elLevelDisplay.innerText = STATE.level;
+                speak("Level Up! You are amazing!");
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+            }
+
+            const currentObj = STATE.words[STATE.currentWordIndex];
+            renderGame(currentObj);
+            
+            // Announce word
+            setTimeout(() => {
+                const wordSpoken = currentObj.word.toLowerCase();
+                speak(`Find the missing letter for ${wordSpoken}`);
+                showMascotMessage("Find the letter!");
+            }, 500);
+        }
+
+        function renderGame(wordObj) {
+            elWordImage.innerText = wordObj.icon;
+            elWordImage.style.transform = "scale(0)";
+            setTimeout(() => elWordImage.style.transform = "scale(1)", 100);
+
+            // Render Word
+            elWordContainer.innerHTML = '';
+            const correctLetter = wordObj.word[wordObj.missingIdx];
+            
+            for (let i = 0; i < wordObj.word.length; i++) {
+                const char = wordObj.word[i];
+                const letterDiv = document.createElement('div');
+                letterDiv.className = "text-5xl md:text-7xl font-black text-gray-700 w-12 md:w-20 text-center flex items-center justify-center h-24";
+                
+                if (i === wordObj.missingIdx) {
+                    letterDiv.innerHTML = `<span class="border-b-8 border-gray-400 w-full animate-pulse text-gray-300">?</span>`;
+                    letterDiv.id = "target-blank";
+                } else {
+                    letterDiv.innerText = char;
+                }
+                elWordContainer.appendChild(letterDiv);
+            }
+
+            // Generate Options
+            const options = generateOptions(correctLetter);
+            renderOptions(options, correctLetter);
+        }
+
+        function generateOptions(correctLetter) {
+            const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            const options = [correctLetter];
+            while (options.length < 3) {
+                const randomChar = alphabet[Math.floor(Math.random() * alphabet.length)];
+                if (!options.includes(randomChar)) {
+                    options.push(randomChar);
+                }
+            }
+            return options.sort(() => Math.random() - 0.5);
+        }
+
+        function renderOptions(letters, correctLetter) {
+            elOptionsContainer.innerHTML = '';
+            
+            letters.forEach(letter => {
+                const btn = document.createElement('div');
+                btn.className = `leaf-btn w-24 h-24 md:w-32 md:h-32 flex items-center justify-center text-4xl md:text-6xl text-white font-bold cursor-pointer transition-transform pop-in select-none`;
+                btn.innerText = letter;
+                btn.dataset.letter = letter;
+                
+                // Add click event for mouse users (fallback)
+                btn.addEventListener('click', () => handleSelection(btn, correctLetter));
+                
+                elOptionsContainer.appendChild(btn);
+            });
+        }
+
+        function handleSelection(element, correctLetter) {
+            // Prevent multiple clicks
+            if (element.classList.contains('locked')) return;
+
+            const selectedLetter = element.dataset.letter;
+
+            if (selectedLetter === correctLetter) {
+                // Success
+                element.classList.add('correct', 'locked');
+                playSound('success');
+                
+                // Animate filling the blank
+                const blank = document.getElementById('target-blank');
+                blank.innerHTML = `<span class="text-green-600 pop-in">${correctLetter}</span>`;
+                blank.classList.remove('border-b-8');
+                
+                // Lock all buttons
+                const allBtns = document.querySelectorAll('.leaf-btn');
+                allBtns.forEach(b => b.classList.add('locked'));
+
+                // XP & Confetti
+                updateXP(STATE.xp + 20);
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+
+                showMascotMessage("Great Job!");
+                speak("Great Job!");
+                elMascotEmoji.classList.add('happy');
+
+                // Next round
+                setTimeout(() => {
+                    STATE.currentWordIndex++;
+                    elMascotEmoji.classList.remove('happy');
+                    loadNextLevel();
+                }, 2000);
+
+            } else {
+                // Fail
+                element.classList.add('wrong');
+                playSound('error');
+                speak("Try again!");
+                showMascotMessage("Try again!");
+                
+                setTimeout(() => {
+                    element.classList.remove('wrong');
+                }, 600);
+            }
+        }
+
+        function updateXP(newXP) {
+            STATE.xp = newXP;
+            if (STATE.xp >= STATE.xpToNextLevel) {
+                STATE.xp = 0; // Reset for visual simplicity or carry over
+                // Level up visual handled in loadNextLevel logic for now
+            }
+            const percentage = (STATE.xp / STATE.xpToNextLevel) * 100;
+            elXpFill.style.width = `${percentage}%`;
+            elXpText.innerText = `${STATE.xp} / ${STATE.xpToNextLevel}`;
+        }
+
+        function showMascotMessage(msg) {
+            elMascotBubble.innerText = msg;
+            elMascotBubble.style.opacity = 1;
+            setTimeout(() => {
+                elMascotBubble.style.opacity = 0;
+            }, 2000);
+        }
+
+        /**
+         * ------------------------------------------------------------------
+         * Logic: MediaPipe & Cursor
+         * ------------------------------------------------------------------
+         */
+        let handLandmarker = undefined;
+        let lastVideoTime = -1;
+        
+        async function setupMediaPipe() {
+            try {
+                const visionGenai = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+                );
+                
+                handLandmarker = await HandLandmarker.createFromOptions(visionGenai, {
+                    baseOptions: {
+                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO",
+                    numHands: 1
+                });
+                
+                elLoadingText.innerText = "Camera Ready! Press Start.";
+                elStartBtn.disabled = false;
+            } catch (error) {
+                console.error("MediaPipe Load Error:", error);
+                elLoadingText.innerText = "Error loading AI. Try refreshing.";
+            }
+        }
+
+        function enableCam(event) {
+            if (!handLandmarker) {
+                alert("Please wait for the AI to load.");
+                return;
+            }
+
+            // Get Webcam
+            const constraints = { video: { width: 480, height: 360 } };
+            navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
+                elWebcam.srcObject = stream;
+                elWebcam.addEventListener("loadeddata", predictWebcam);
+                
+                // UI Switch
+                elStartScreen.classList.add('hidden');
+                elGameContainer.classList.remove('hidden');
+                elCursor.style.display = "block";
+                
+                initGame();
+            });
+        }
+
+        async function predictWebcam() {
+            // Resize canvas to match video
+            elCanvas.width = elWebcam.videoWidth;
+            elCanvas.height = elWebcam.videoHeight;
+            
+            let startTimeMs = performance.now();
+            
+            if (lastVideoTime !== elWebcam.currentTime) {
+                lastVideoTime = elWebcam.currentTime;
+                const results = handLandmarker.detectForVideo(elWebcam, startTimeMs);
+                
+                const canvasCtx = elCanvas.getContext("2d");
+                canvasCtx.save();
+                canvasCtx.clearRect(0, 0, elCanvas.width, elCanvas.height);
+                
+                if (results.landmarks && results.landmarks.length > 0) {
+                    // Get Index Finger Tip (Landmark 8)
+                    const landmarks = results.landmarks[0];
+                    const indexTip = landmarks[8];
+                    
+                    // Draw Hand Skeleton (Simplified) on debug canvas
+                    // Just drawing the fingertip
+                    canvasCtx.fillStyle = "#FFC107";
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(indexTip.x * elCanvas.width, indexTip.y * elCanvas.height, 10, 0, 2 * Math.PI);
+                    canvasCtx.fill();
+
+                    // Map to Screen Coordinates
+                    // x is mirrored (1 - x)
+                    const screenX = (1 - indexTip.x) * window.innerWidth;
+                    const screenY = indexTip.y * window.innerHeight;
+                    
+                    updateCursorPosition(screenX, screenY);
+                    checkCollisions(screenX, screenY);
+                } else {
+                    STATE.hoverTargetId = null; // Reset hover if hand lost
+                    elCursor.classList.remove("cursor-loading");
+                }
+                
+                canvasCtx.restore();
+            }
+            
+            window.requestAnimationFrame(predictWebcam);
+        }
+
+        function updateCursorPosition(x, y) {
+            // Simple Linear Interpolation (LERP) for smoothness
+            const lerpFactor = 0.2;
+            STATE.cursor.x = STATE.cursor.x + (x - STATE.cursor.x) * lerpFactor;
+            STATE.cursor.y = STATE.cursor.y + (y - STATE.cursor.y) * lerpFactor;
+
+            elCursor.style.left = `${STATE.cursor.x}px`;
+            elCursor.style.top = `${STATE.cursor.y}px`;
+        }
+
+        function checkCollisions(x, y) {
+            if (!STATE.isGameActive) return;
+
+            const targets = document.querySelectorAll('.leaf-btn:not(.locked)');
+            let isHovering = false;
+
+            targets.forEach(target => {
+                const rect = target.getBoundingClientRect();
+                
+                // Simple AABB collision
+                if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                    isHovering = true;
+                    
+                    if (STATE.hoverTargetId !== target.dataset.letter) {
+                        // New Hover Start
+                        STATE.hoverTargetId = target.dataset.letter;
+                        STATE.hoverStartTime = Date.now();
+                        target.classList.add('hovered');
+                        elCursor.classList.add("cursor-loading");
+                        playSound('hover');
+                    } else {
+                        // Continuing Hover
+                        const elapsed = Date.now() - STATE.hoverStartTime;
+                        
+                        // Check trigger
+                        if (elapsed > CONFIG.hoverDuration) {
+                            // Click Triggered!
+                            const correctLetter = STATE.words[STATE.currentWordIndex].word[STATE.words[STATE.currentWordIndex].missingIdx];
+                            handleSelection(target, correctLetter);
+                            
+                            // Reset hover state immediately to prevent double clicks
+                            STATE.hoverTargetId = null;
+                            STATE.hoverStartTime = Date.now() + 5000; // Delay next interaction
+                            elCursor.classList.remove("cursor-loading");
+                            target.classList.remove('hovered');
+                        }
+                    }
+                } else {
+                    target.classList.remove('hovered');
+                }
+            });
+
+            if (!isHovering) {
+                STATE.hoverTargetId = null;
+                elCursor.classList.remove("cursor-loading");
+            }
+        }
+
+        // Initialize
+        window.onload = () => {
+            setupMediaPipe();
+            elStartBtn.addEventListener('click', enableCam);
+        };
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LIVE PUZZLE // NEURAL INTERFACE</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- MediaPipe Libraries -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
+      crossorigin="anonymous"
+    ></script>
+
+    <style>
+      :root {
+        --bg-color: #050505;
+        --neon-green: #9aff00;
+        --neon-dim: rgba(154, 255, 0, 0.2);
+        --text-color: #ffffff;
+        --grid-color: rgba(255, 255, 255, 0.1);
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: "Share Tech Mono", monospace;
+        overflow: hidden;
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        user-select: none;
+      }
+
+      /* Container for the visual layers */
+      #stage {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      /* The hidden video element for raw input */
+      /* Changed from display:none to opacity:0 to ensure drawImage works correctly */
+      #input_video {
+        position: absolute;
+        top: 0;
+        left: 0;
+        opacity: 0;
+        z-index: -1;
+        width: 1px;
+        height: 1px;
+        pointer-events: none;
+      }
+
+      /* The main rendering surface */
+      canvas {
+        position: absolute;
+        max-width: 100%;
+        max-height: 100%;
+        box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+        border: 1px solid var(--grid-color);
+      }
+
+      /* CRT Scanline Effect Overlay */
+      #scanlines {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0),
+          rgba(255, 255, 255, 0) 50%,
+          rgba(0, 0, 0, 0.2) 50%,
+          rgba(0, 0, 0, 0.2)
+        );
+        background-size: 100% 4px;
+        pointer-events: none;
+        z-index: 10;
+      }
+
+      /* Vignette Overlay */
+      #vignette {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(
+          circle,
+          transparent 40%,
+          rgba(0, 0, 0, 0.8) 90%
+        );
+        pointer-events: none;
+        z-index: 9;
+      }
+
+      /* HUD Elements */
+      #hud {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 20;
+        pointer-events: none;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 24px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        text-shadow: 0 0 10px var(--neon-green);
+        color: var(--neon-green);
+      }
+
+      .status-line {
+        font-size: 14px;
+        opacity: 0.8;
+        margin-top: 5px;
+      }
+
+      #loading {
+        position: absolute;
+        z-index: 100;
+        background: #000;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: var(--neon-green);
+      }
+
+      .loader-spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid var(--neon-dim);
+        border-top: 3px solid var(--neon-green);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Tutorial/Message Box */
+      #message-box {
+        position: absolute;
+        bottom: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        z-index: 20;
+        pointer-events: none;
+      }
+
+      .message {
+        background: rgba(0, 20, 0, 0.8);
+        border: 1px solid var(--neon-green);
+        padding: 10px 20px;
+        font-size: 18px;
+        color: white;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        box-shadow: 0 0 15px var(--neon-dim);
+        backdrop-filter: blur(4px);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loading">
+      <div class="loader-spinner"></div>
+      <div>INITIALIZING NEURAL LINK...</div>
+    </div>
+
+    <div id="stage">
+      <video id="input_video"></video>
+      <canvas id="output_canvas"></canvas>
+      <div id="vignette"></div>
+      <div id="scanlines"></div>
+
+      <div id="hud">
+        <h1>LIVE PUZZLE v1.0</h1>
+        <div class="status-line" id="fps-display">FPS: --</div>
+        <div class="status-line" id="hand-status">HANDS: SEARCHING...</div>
+        <div class="status-line" id="mode-display">MODE: IDLE</div>
+      </div>
+
+      <div id="message-box">
+        <div class="message" id="instruction-text">Initializing Camera...</div>
+      </div>
+    </div>
+
+    <script>
+      // --- CONFIGURATION ---
+      const CONFIG = {
+        gridSize: 3, // 3x3 puzzle
+        snapDistance: 50, // Pixels
+        pinchThreshold: 0.05, // Normalized distance
+        smoothing: 0.5, // 0 to 1 (higher = more latency, smoother)
+        lineWidth: 2,
+        neonColor: "#9AFF00",
+        inactiveColor: "rgba(255, 255, 255, 0.3)",
+      };
+
+      // --- STATE MANAGEMENT ---
+      const STATE = {
+        IDLE: 0,
+        CAMERA: 1,
+        PUZZLE: 2,
+        SOLVED: 3,
+      };
+      let currentState = STATE.IDLE;
+
+      // --- DOM ELEMENTS ---
+      const videoElement = document.getElementById("input_video");
+      const canvasElement = document.getElementById("output_canvas");
+      const canvasCtx = canvasElement.getContext("2d");
+      const loadingScreen = document.getElementById("loading");
+      const instructionText = document.getElementById("instruction-text");
+      const fpsDisplay = document.getElementById("fps-display");
+      const handStatus = document.getElementById("hand-status");
+      const modeDisplay = document.getElementById("mode-display");
+
+      // --- VARIABLES ---
+      let canvasWidth, canvasHeight;
+      let puzzlePieces = [];
+      let solvedPiecesCount = 0;
+      let capturedImage = null; // Stores the frozen frame
+      let cursor = { x: 0, y: 0, active: false, pinching: false };
+      let draggedPiece = null;
+      let dragOffset = { x: 0, y: 0 };
+
+      // Smoothing variables for hand tracking
+      let prevThumb = null;
+      let prevIndex = null;
+
+      // Audio Context for beeps
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const audioCtx = new AudioContext();
+
+      function playSound(type) {
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+
+        if (type === "pinch") {
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(800, now);
+          osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+          osc.start(now);
+          osc.stop(now + 0.1);
+        } else if (type === "snap") {
+          osc.type = "square";
+          osc.frequency.setValueAtTime(400, now);
+          osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+          osc.start(now);
+          osc.stop(now + 0.15);
+        } else if (type === "win") {
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.linearRampToValueAtTime(880, now + 0.2);
+          osc.frequency.linearRampToValueAtTime(1760, now + 0.5);
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.linearRampToValueAtTime(0, now + 1.0);
+          osc.start(now);
+          osc.stop(now + 1.0);
+        }
+      }
+
+      // --- PUZZLE LOGIC ---
+
+      class Piece {
+        constructor(id, row, col, imgData, x, y, width, height) {
+          this.id = id;
+          this.correctRow = row;
+          this.correctCol = col;
+          this.width = width;
+          this.height = height;
+          this.imgData = imgData;
+
+          // Target position (grid slot)
+          this.targetX = x;
+          this.targetY = y;
+
+          // Current position (randomized initially)
+          // Scatter pieces slightly around the center but visible
+          this.x = x + (Math.random() - 0.5) * 200;
+          this.y = y + (Math.random() - 0.5) * 200;
+
+          this.isLocked = false;
+          this.isHovered = false;
+        }
+
+        draw(ctx) {
+          // Draw image part
+          if (this.imgData) {
+            ctx.save();
+            // Clip to piece shape (simple rect for now, could be jigsaw path)
+            ctx.beginPath();
+            ctx.rect(this.x, this.y, this.width, this.height);
+            ctx.clip();
+            ctx.drawImage(
+              this.imgData,
+              this.x,
+              this.y,
+              this.width,
+              this.height,
+            );
+            ctx.restore();
+          }
+
+          // Border/Glow
+          ctx.lineWidth = 2;
+          if (this.isLocked) {
+            ctx.strokeStyle = CONFIG.neonColor; // Green if correct
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
+          } else if (this.isHovered) {
+            ctx.strokeStyle = "white";
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
+            ctx.fillStyle = "rgba(255,255,255,0.1)";
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+          } else {
+            ctx.strokeStyle = "rgba(154, 255, 0, 0.3)";
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
+          }
+        }
+
+        contains(px, py) {
+          return (
+            px >= this.x &&
+            px <= this.x + this.width &&
+            py >= this.y &&
+            py <= this.y + this.height
+          );
+        }
+      }
+
+      function createPuzzle() {
+        puzzlePieces = [];
+        solvedPiecesCount = 0;
+        const pieceW = canvasWidth / CONFIG.gridSize;
+        const pieceH = canvasHeight / CONFIG.gridSize;
+
+        // Create a temporary canvas to hold the snapshot
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = canvasWidth;
+        tempCanvas.height = canvasHeight;
+        const tempCtx = tempCanvas.getContext("2d");
+
+        // Draw the video frame (mirrored horizontal for natural feel)
+        tempCtx.translate(canvasWidth, 0);
+        tempCtx.scale(-1, 1);
+        tempCtx.drawImage(videoElement, 0, 0, canvasWidth, canvasHeight);
+
+        // Create texture chunks
+        for (let r = 0; r < CONFIG.gridSize; r++) {
+          for (let c = 0; c < CONFIG.gridSize; c++) {
+            // Extract image data for this piece
+            // We create a mini-canvas for each piece to optimize rendering
+            const pCanvas = document.createElement("canvas");
+            pCanvas.width = pieceW;
+            pCanvas.height = pieceH;
+            const pCtx = pCanvas.getContext("2d");
+
+            // Draw strict portion of source to piece canvas
+            pCtx.drawImage(
+              tempCanvas,
+              c * pieceW,
+              r * pieceH,
+              pieceW,
+              pieceH,
+              0,
+              0,
+              pieceW,
+              pieceH,
+            );
+
+            const targetX = c * pieceW;
+            const targetY = r * pieceH;
+
+            const piece = new Piece(
+              r * CONFIG.gridSize + c,
+              r,
+              c,
+              pCanvas,
+              targetX,
+              targetY,
+              pieceW,
+              pieceH,
+            );
+            puzzlePieces.push(piece);
+          }
+        }
+
+        // Shuffle z-order implicitly by array order?
+        // Better to shuffle positions slightly.
+        // (Done in constructor)
+
+        currentState = STATE.PUZZLE;
+        updateUI();
+      }
+
+      function updatePuzzleLogic() {
+        if (currentState !== STATE.PUZZLE) return;
+
+        let hovering = false;
+
+        // Handle Interaction
+        // 1. Find hovered piece (reverse order to pick top-most)
+        if (!draggedPiece) {
+          for (let i = puzzlePieces.length - 1; i >= 0; i--) {
+            const p = puzzlePieces[i];
+            p.isHovered = false;
+            if (
+              !p.isLocked &&
+              cursor.active &&
+              p.contains(cursor.x, cursor.y)
+            ) {
+              if (!hovering) {
+                // Only highlight top one
+                p.isHovered = true;
+                hovering = true;
+
+                // Start Drag
+                if (cursor.pinching) {
+                  draggedPiece = p;
+                  dragOffset.x = cursor.x - p.x;
+                  dragOffset.y = cursor.y - p.y;
+                  playSound("pinch");
+                  // Move to end of array to render on top
+                  puzzlePieces.splice(i, 1);
+                  puzzlePieces.push(p);
+                }
+              }
+            }
+          }
+        } else {
+          // Dragging
+          draggedPiece.isHovered = true;
+          draggedPiece.x = cursor.x - dragOffset.x;
+          draggedPiece.y = cursor.y - dragOffset.y;
+
+          // Stop Drag
+          if (!cursor.pinching) {
+            // Check Snap
+            const dist = Math.hypot(
+              draggedPiece.x - draggedPiece.targetX,
+              draggedPiece.y - draggedPiece.targetY,
+            );
+
+            if (dist < CONFIG.snapDistance) {
+              draggedPiece.x = draggedPiece.targetX;
+              draggedPiece.y = draggedPiece.targetY;
+              draggedPiece.isLocked = true;
+              draggedPiece.isHovered = false;
+              solvedPiecesCount++;
+              playSound("snap");
+
+              if (solvedPiecesCount === CONFIG.gridSize * CONFIG.gridSize) {
+                gameWin();
+              }
+            }
+            draggedPiece = null;
+          }
+        }
+      }
+
+      function drawPuzzle() {
+        // Draw grid background hint
+        canvasCtx.strokeStyle = "rgba(255,255,255,0.05)";
+        canvasCtx.lineWidth = 1;
+        const w = canvasWidth / CONFIG.gridSize;
+        const h = canvasHeight / CONFIG.gridSize;
+
+        canvasCtx.beginPath();
+        for (let i = 1; i < CONFIG.gridSize; i++) {
+          canvasCtx.moveTo(i * w, 0);
+          canvasCtx.lineTo(i * w, canvasHeight);
+          canvasCtx.moveTo(0, i * h);
+          canvasCtx.lineTo(canvasWidth, i * h);
+        }
+        canvasCtx.stroke();
+
+        // Draw pieces
+        for (let p of puzzlePieces) {
+          p.draw(canvasCtx);
+        }
+      }
+
+      function gameWin() {
+        currentState = STATE.SOLVED;
+        playSound("win");
+        updateUI();
+        setTimeout(() => {
+          resetGame();
+        }, 5000);
+      }
+
+      function resetGame() {
+        currentState = STATE.CAMERA;
+        puzzlePieces = [];
+        solvedPiecesCount = 0;
+        updateUI();
+      }
+
+      // --- HAND TRACKING & VISUALS ---
+
+      function lerp(start, end, amt) {
+        return (1 - amt) * start + amt * end;
+      }
+
+      function onResults(results) {
+        // Clear or fill background
+        canvasCtx.save();
+
+        if (currentState === STATE.CAMERA || currentState === STATE.IDLE) {
+          canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+          // Draw video frame mirrored
+          canvasCtx.translate(canvasElement.width, 0);
+          canvasCtx.scale(-1, 1);
+          canvasCtx.drawImage(
+            results.image,
+            0,
+            0,
+            canvasElement.width,
+            canvasElement.height,
+          );
+          canvasCtx.restore();
+        } else {
+          // Puzzle mode: clear background to dark
+          canvasCtx.fillStyle = "#111";
+          canvasCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+        }
+
+        // Draw Puzzle Layers if active
+        if (currentState === STATE.PUZZLE || currentState === STATE.SOLVED) {
+          updatePuzzleLogic();
+          drawPuzzle();
+        }
+
+        // Handle Hands
+        if (
+          results.multiHandLandmarks &&
+          results.multiHandLandmarks.length > 0
+        ) {
+          handStatus.innerText = "HANDS: TRACKED";
+          handStatus.style.color = CONFIG.neonColor;
+          cursor.active = true;
+
+          // We only use the first detected hand for interaction to avoid confusion
+          const landmarks = results.multiHandLandmarks[0];
+          drawFuturisticHand(landmarks);
+          detectGestures(landmarks);
+        } else {
+          handStatus.innerText = "HANDS: SEARCHING...";
+          handStatus.style.color = "white";
+          cursor.active = false;
+          draggedPiece = null; // Drop if hand lost
+        }
+
+        // Draw HUD overlays
+        drawCursor();
+      }
+
+      function drawFuturisticHand(landmarks) {
+        canvasCtx.lineWidth = CONFIG.lineWidth;
+
+        // Draw connections
+        // Use global HAND_CONNECTIONS or fallback if undefined
+        const connections =
+          typeof HAND_CONNECTIONS !== "undefined"
+            ? HAND_CONNECTIONS
+            : [
+                [0, 1],
+                [1, 2],
+                [2, 3],
+                [3, 4],
+                [0, 5],
+                [5, 6],
+                [6, 7],
+                [7, 8],
+                [0, 9],
+                [9, 10],
+                [10, 11],
+                [11, 12],
+                [0, 13],
+                [13, 14],
+                [14, 15],
+                [15, 16],
+                [0, 17],
+                [17, 18],
+                [18, 19],
+                [19, 20],
+              ];
+
+        for (const conn of connections) {
+          const p1 = landmarks[conn[0]];
+          const p2 = landmarks[conn[1]];
+
+          // Mirror coordinates for display
+          const x1 = (1 - p1.x) * canvasWidth;
+          const y1 = p1.y * canvasHeight;
+          const x2 = (1 - p2.x) * canvasWidth;
+          const y2 = p2.y * canvasHeight;
+
+          canvasCtx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+          canvasCtx.beginPath();
+          canvasCtx.moveTo(x1, y1);
+          canvasCtx.lineTo(x2, y2);
+          canvasCtx.stroke();
+        }
+
+        // Draw joints
+        for (let i = 0; i < landmarks.length; i++) {
+          const x = (1 - landmarks[i].x) * canvasWidth;
+          const y = landmarks[i].y * canvasHeight;
+
+          // Fingertips glow
+          if ([4, 8, 12, 16, 20].includes(i)) {
+            canvasCtx.fillStyle = CONFIG.neonColor;
+            canvasCtx.shadowBlur = 10;
+            canvasCtx.shadowColor = CONFIG.neonColor;
+            canvasCtx.beginPath();
+            canvasCtx.arc(x, y, 4, 0, 2 * Math.PI);
+            canvasCtx.fill();
+            canvasCtx.shadowBlur = 0;
+          } else {
+            canvasCtx.fillStyle = "rgba(255,255,255,0.5)";
+            canvasCtx.beginPath();
+            canvasCtx.arc(x, y, 2, 0, 2 * Math.PI);
+            canvasCtx.fill();
+          }
+        }
+      }
+
+      function detectGestures(landmarks) {
+        // Index Tip (8) and Thumb Tip (4)
+        const thumb = landmarks[4];
+        const index = landmarks[8];
+
+        // Convert normalized to pixel coords (mirrored)
+        const tx = (1 - thumb.x) * canvasWidth;
+        const ty = thumb.y * canvasHeight;
+        const ix = (1 - index.x) * canvasWidth;
+        const iy = index.y * canvasHeight;
+
+        // Calculate Distance (Pinch)
+        const dist = Math.hypot(tx - ix, ty - iy);
+
+        // Determine pinch state based on screen size ratio approximately
+        // Map 0.05 normalized to pixels roughly
+        const threshold =
+          Math.min(canvasWidth, canvasHeight) * CONFIG.pinchThreshold;
+
+        const isPinching = dist < threshold;
+
+        // Smooth Cursor Position (Midpoint of pinch)
+        const targetCX = (tx + ix) / 2;
+        const targetCY = (ty + iy) / 2;
+
+        if (prevThumb === null) {
+          cursor.x = targetCX;
+          cursor.y = targetCY;
+        } else {
+          cursor.x = lerp(cursor.x, targetCX, CONFIG.smoothing);
+          cursor.y = lerp(cursor.y, targetCY, CONFIG.smoothing);
+        }
+
+        prevThumb = { x: tx, y: ty };
+
+        // Logic trigger
+        if (isPinching && !cursor.pinching) {
+          // Pinch Start
+          cursor.pinching = true;
+          handlePinchStart();
+        } else if (!isPinching && cursor.pinching) {
+          // Pinch End
+          cursor.pinching = false;
+          handlePinchEnd();
+        }
+      }
+
+      function drawCursor() {
+        if (!cursor.active) return;
+
+        canvasCtx.beginPath();
+        canvasCtx.lineWidth = 2;
+
+        if (cursor.pinching) {
+          // Locked cursor style
+          canvasCtx.strokeStyle = CONFIG.neonColor;
+          canvasCtx.fillStyle = "rgba(154, 255, 0, 0.5)";
+          canvasCtx.arc(cursor.x, cursor.y, 10, 0, 2 * Math.PI);
+          canvasCtx.fill();
+          canvasCtx.stroke();
+
+          // Crosshair
+          canvasCtx.beginPath();
+          canvasCtx.moveTo(cursor.x - 15, cursor.y);
+          canvasCtx.lineTo(cursor.x + 15, cursor.y);
+          canvasCtx.moveTo(cursor.x, cursor.y - 15);
+          canvasCtx.lineTo(cursor.x, cursor.y + 15);
+          canvasCtx.stroke();
+        } else {
+          // Hover cursor style
+          canvasCtx.strokeStyle = "white";
+          canvasCtx.arc(cursor.x, cursor.y, 15, 0, 2 * Math.PI);
+          canvasCtx.stroke();
+
+          // Small center dot
+          canvasCtx.beginPath();
+          canvasCtx.fillStyle = "white";
+          canvasCtx.arc(cursor.x, cursor.y, 2, 0, 2 * Math.PI);
+          canvasCtx.fill();
+        }
+      }
+
+      function handlePinchStart() {
+        if (currentState === STATE.CAMERA) {
+          // Capture mechanic
+          // Delay slightly to ensure intended pinch
+          setTimeout(() => {
+            if (cursor.pinching && currentState === STATE.CAMERA) {
+              playSound("snap");
+              createPuzzle();
+            }
+          }, 200);
+        }
+      }
+
+      function handlePinchEnd() {
+        // Logic handled in updatePuzzleLogic (drop piece)
+      }
+
+      function updateUI() {
+        switch (currentState) {
+          case STATE.CAMERA:
+            instructionText.innerText = "PINCH TO CAPTURE TARGET";
+            modeDisplay.innerText = "MODE: CAMERA SCAN";
+            instructionText.style.color = "white";
+            instructionText.style.borderColor = CONFIG.neonColor;
+            break;
+          case STATE.PUZZLE:
+            instructionText.innerText = "PINCH & DRAG PIECES TO GRID";
+            modeDisplay.innerText = "MODE: RECONSTRUCTION";
+            break;
+          case STATE.SOLVED:
+            instructionText.innerText = "SYSTEM RESTORED. RESETTING...";
+            modeDisplay.innerText = "MODE: SUCCESS";
+            instructionText.style.color = CONFIG.neonColor;
+            instructionText.style.borderColor = "white";
+            break;
+        }
+      }
+
+      // --- INITIALIZATION ---
+
+      const hands = new Hands({
+        locateFile: (file) => {
+          return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        },
+      });
+
+      hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+
+      hands.onResults(onResults);
+
+      const camera = new Camera(videoElement, {
+        onFrame: async () => {
+          await hands.send({ image: videoElement });
+        },
+        width: 1280,
+        height: 720,
+      });
+
+      // Handle Resize
+      function resize() {
+        canvasElement.width = window.innerWidth;
+        canvasElement.height = window.innerHeight;
+        canvasWidth = canvasElement.width;
+        canvasHeight = canvasElement.height;
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      // Start
+      camera
+        .start()
+        .then(() => {
+          loadingScreen.style.display = "none";
+          currentState = STATE.CAMERA;
+          updateUI();
+        })
+        .catch((err) => {
+          console.error(err);
+          instructionText.innerText = "CAMERA ACCESS DENIED";
+          instructionText.style.color = "red";
+          loadingScreen.style.display = "none";
+        });
+
+      // FPS Counter
+      let lastTime = 0;
+      function loop(timestamp) {
+        const delta = timestamp - lastTime;
+        lastTime = timestamp;
+        const fps = Math.round(1000 / delta);
+        if (timestamp % 10 < 1) fpsDisplay.innerText = `FPS: ${fps}`;
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+    </script>
+  </body>
+</html>

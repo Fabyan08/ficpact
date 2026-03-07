@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Level 2: Susun Sila Pancasila</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- MediaPipe Hand Tracking -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
+      crossorigin="anonymous"
+    ></script>
+
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap");
+
+      body {
+        font-family: "Nunito", sans-serif;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        touch-action: none;
+        user-select: none;
+      }
+
+      /* Latar Belakang & Animasi Dasar */
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-10px);
+        }
+      }
+      .animate-float {
+        animation: float 3s ease-in-out infinite;
+      }
+
+      @keyframes drift {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(100vw);
+        }
+      }
+      .animate-drift-slow {
+        animation: drift 40s linear infinite;
+      }
+      .animate-drift-fast {
+        animation: drift 25s linear infinite;
+      }
+
+      @keyframes pop-in {
+        0% {
+          transform: scale(0.5);
+          opacity: 0;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      .animate-pop-in {
+        animation: pop-in 0.5s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+
+      @keyframes wiggle {
+        0%,
+        100% {
+          transform: rotate(0deg);
+        }
+        25% {
+          transform: rotate(-5deg);
+        }
+        75% {
+          transform: rotate(5deg);
+        }
+      }
+      .animate-wiggle {
+        animation: wiggle 0.3s ease-in-out;
+      }
+
+      @keyframes slot-glow {
+        0%,
+        100% {
+          box-shadow: 0 0 10px rgba(34, 197, 94, 0.5) inset;
+        }
+        50% {
+          box-shadow: 0 0 30px rgba(34, 197, 94, 0.9) inset;
+          border-color: #4ade80;
+        }
+      }
+      .animate-slot-glow {
+        animation: slot-glow 1.5s infinite;
+      }
+
+      /* Kursor Kamera Tangan */
+      #hand-cursor {
+        position: absolute;
+        width: 80px;
+        height: 80px;
+        pointer-events: none;
+        z-index: 1000;
+        transform: translate(-50%, -50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.1s ease-out; /* Untuk efek jepit membesar/mengecil */
+      }
+
+      .cursor-icon {
+        font-size: 3rem;
+        filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+        transition: all 0.2s;
+      }
+
+      /* Kartu Draggable */
+      .draggable-card {
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+        touch-action: none;
+        will-change: transform, left, top;
+      }
+      /* Sorotan saat tangan diarahkan tapi belum dijepit */
+      .draggable-card.hover-highlight {
+        transform: scale(1.1);
+        box-shadow: 0 0 20px 8px rgba(255, 255, 255, 0.8) !important;
+        z-index: 30;
+      }
+      .draggable-card.dragging {
+        position: fixed;
+        z-index: 500;
+        opacity: 0.9;
+        transform: translate(-50%, -50%) scale(1.1) rotate(-2deg);
+        pointer-events: none;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+        transition: none !important; /* FIX LAG: Mematikan animasi bawaan CSS agar kartu 100% menempel instan pada kursor tangan */
+      }
+      .draggable-card.placed {
+        position: relative;
+        transform: none !important;
+        pointer-events: none;
+        box-shadow: none !important;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        animation: pop-in 0.4s ease-out;
+      }
+
+      /* Slot Jawaban */
+      .slot {
+        transition: all 0.3s ease;
+      }
+      .slot.hovered {
+        background-color: #dcfce7 !important; /* Hijau muda */
+        border-color: #22c55e !important;
+        transform: scale(1.05);
+      }
+
+      /* Custom Scrollbar untuk kontainer kartu di bawah */
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .hide-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-gradient-to-b from-sky-300 to-green-300 h-screen w-full relative"
+  >
+    <!-- Kursor Visual Hand Tracking -->
+    <div id="hand-cursor" style="opacity: 0">
+      <div id="cursor-emoji" class="cursor-icon">🖐️</div>
+    </div>
+
+    <!-- --- SCENERY BACKGROUND --- -->
+    <div class="absolute inset-0 pointer-events-none z-0">
+      <div class="absolute top-10 left-[-20%] animate-drift-slow opacity-80">
+        <svg width="150" height="80" viewBox="0 0 24 24" fill="white">
+          <path
+            d="M17.5 19c2.485 0 4.5-2.015 4.5-4.5S19.985 10 17.5 10c-.17 0-.336.01-.5.027A6.49 6.49 0 0011 5c-3.59 0-6.5 2.91-6.5 6.5 0 .238.013.473.039.704A4.5 4.5 0 005.5 21h12z"
+          />
+        </svg>
+      </div>
+      <div
+        class="absolute top-32 left-[-10%] animate-drift-fast opacity-60 scale-75"
+      >
+        <svg width="200" height="100" viewBox="0 0 24 24" fill="white">
+          <path
+            d="M17.5 19c2.485 0 4.5-2.015 4.5-4.5S19.985 10 17.5 10c-.17 0-.336.01-.5.027A6.49 6.49 0 0011 5c-3.59 0-6.5 2.91-6.5 6.5 0 .238.013.473.039.704A4.5 4.5 0 005.5 21h12z"
+          />
+        </svg>
+      </div>
+      <div
+        class="absolute bottom-0 w-full h-1/4 bg-green-500 rounded-t-[100%] scale-x-150 transform translate-y-12"
+      ></div>
+    </div>
+
+    <!-- --- TOP BAR --- -->
+    <div
+      class="relative z-20 flex justify-between items-start p-4 md:p-6 w-full"
+    >
+      <!-- Info Pemain -->
+      <div
+        class="flex items-center gap-3 bg-white/60 backdrop-blur-md p-2 pr-6 rounded-full border-4 border-white shadow-lg"
+      >
+        <div
+          class="w-14 h-14 bg-blue-400 rounded-full border-4 border-white flex items-center justify-center text-3xl shadow-inner"
+        >
+          👦🏽
+        </div>
+        <div>
+          <h2
+            class="font-black text-xl text-blue-900 tracking-wide drop-shadow-sm"
+          >
+            Penjelajah Level 1
+          </h2>
+          <div class="flex text-yellow-500 drop-shadow">
+            <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+            <i
+              data-lucide="star"
+              class="w-4 h-4 fill-current text-gray-400"
+            ></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bar XP -->
+      <div class="hidden md:flex flex-col items-center pt-2">
+        <div
+          class="bg-white/70 backdrop-blur-md px-6 py-2 rounded-2xl border-4 border-white shadow-lg flex flex-col items-center"
+        >
+          <span class="font-black text-blue-900 text-lg mb-1" id="xp-text"
+            >80 / 100 XP</span
+          >
+          <div
+            class="w-48 h-5 bg-blue-900/20 rounded-full overflow-hidden shadow-inner border-2 border-white/50 relative"
+          >
+            <div
+              id="xp-bar-fill"
+              class="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-300 to-yellow-500 rounded-full transition-all duration-1000 ease-out"
+              style="width: 80%"
+            ></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kamera Tangan & Maskot -->
+      <div class="flex items-start gap-4">
+        <div
+          class="relative hidden lg:flex flex-col items-end pt-4 animate-float"
+        >
+          <div
+            class="bg-white px-4 py-3 rounded-2xl rounded-br-none shadow-xl border-4 border-blue-200 mb-2 max-w-[220px]"
+          >
+            <p id="owl-message" class="font-bold text-blue-900 text-sm">
+              Arahkan tanganmu lalu jepit kartu!
+            </p>
+          </div>
+          <!-- Owl SVG -->
+          <svg
+            width="80"
+            height="80"
+            viewBox="0 0 100 100"
+            class="drop-shadow-lg"
+          >
+            <circle cx="50" cy="50" r="40" fill="#8b5cf6" />
+            <circle cx="50" cy="65" r="30" fill="#a78bfa" />
+            <circle cx="35" cy="40" r="14" fill="white" />
+            <circle cx="65" cy="40" r="14" fill="white" />
+            <circle cx="35" cy="40" r="6" fill="#1e1b4b" />
+            <circle cx="65" cy="40" r="6" fill="#1e1b4b" />
+            <path d="M45 50 L55 50 L50 60 Z" fill="#fbbf24" />
+            <path d="M10 50 Q 5 65 20 75 Z" fill="#7c3aed" />
+            <path d="M90 50 Q 95 65 80 75 Z" fill="#7c3aed" />
+          </svg>
+        </div>
+
+        <!-- Kamera Feed -->
+        <div
+          class="bg-slate-800 p-2 rounded-2xl border-4 border-slate-600 shadow-xl flex flex-col items-center w-36 h-32 relative overflow-hidden"
+        >
+          <div class="absolute top-2 left-2 flex items-center gap-1 z-10">
+            <div
+              id="cam-indicator"
+              class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"
+            ></div>
+            <span
+              id="cam-status"
+              class="text-[10px] text-white font-bold tracking-wider drop-shadow-md"
+              >LOADING</span
+            >
+          </div>
+          <video
+            id="input_video"
+            class="w-full h-full object-cover rounded-xl mt-4 scale-x-[-1]"
+            autoplay
+            playsinline
+          ></video>
+          <div
+            class="absolute bottom-2 text-xs text-white font-bold drop-shadow-md z-10 bg-black/30 px-2 rounded-full"
+          >
+            Hand Cam
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- --- MAIN GAME UI --- -->
+    <div
+      class="absolute inset-x-0 top-32 bottom-4 z-10 flex flex-col items-center pt-2"
+    >
+      <!-- Judul -->
+      <div class="text-center mb-6">
+        <div
+          class="bg-white/80 backdrop-blur-sm px-8 py-3 rounded-full border-4 border-white shadow-md inline-block mb-2"
+        >
+          <h1 class="text-2xl md:text-3xl font-black text-gray-800">
+            Susun Sila Pancasila
+          </h1>
+        </div>
+        <h3
+          class="text-lg text-blue-900 font-bold drop-shadow-md bg-white/50 px-4 py-1 rounded-full inline-block"
+        >
+          Taruh kartu ke urutan angka yang benar!
+        </h3>
+      </div>
+
+      <!-- Area Atas: 5 Slot Kosong -->
+      <div
+        id="slots-container"
+        class="flex flex-wrap justify-center gap-4 md:gap-6 w-[95%] max-w-5xl mb-8"
+      >
+        <!-- Slots akan dirender oleh JS -->
+      </div>
+
+      <!-- Progress Dots -->
+      <div class="flex justify-center gap-3 mb-6" id="progress-dots">
+        <div
+          class="w-4 h-4 bg-gray-300 rounded-full border-2 border-white shadow-sm dot"
+          id="dot-1"
+        ></div>
+        <div
+          class="w-4 h-4 bg-gray-300 rounded-full border-2 border-white shadow-sm dot"
+          id="dot-2"
+        ></div>
+        <div
+          class="w-4 h-4 bg-gray-300 rounded-full border-2 border-white shadow-sm dot"
+          id="dot-3"
+        ></div>
+        <div
+          class="w-4 h-4 bg-gray-300 rounded-full border-2 border-white shadow-sm dot"
+          id="dot-4"
+        ></div>
+        <div
+          class="w-4 h-4 bg-gray-300 rounded-full border-2 border-white shadow-sm dot"
+          id="dot-5"
+        ></div>
+      </div>
+
+      <!-- Area Bawah: Kartu yang bisa ditarik -->
+      <div
+        class="w-full mt-auto bg-white/40 backdrop-blur-md border-t-8 border-white p-6 pb-8 shadow-[0_-10px_20px_rgba(0,0,0,0.1)]"
+      >
+        <div
+          id="cards-container"
+          class="flex overflow-x-auto justify-center gap-4 hide-scrollbar px-4 w-full max-w-6xl mx-auto py-2"
+        >
+          <!-- Kartu akan dirender oleh JS secara acak -->
+        </div>
+      </div>
+    </div>
+
+    <!-- --- TUTORIAL OVERLAY --- -->
+    <div
+      id="tutorial-overlay"
+      class="fixed inset-0 z-[60] bg-sky-900/80 backdrop-blur-md flex flex-col items-center justify-center"
+    >
+      <div
+        class="bg-white p-8 md:p-12 rounded-[3rem] shadow-2xl border-8 border-yellow-400 flex flex-col items-center max-w-2xl text-center animate-pop-in relative overflow-hidden"
+      >
+        <div
+          class="absolute -top-10 -right-10 text-9xl opacity-10 pointer-events-none"
+        >
+          🦉
+        </div>
+
+        <h1 class="text-4xl font-black text-gray-800 mb-2">Cara Bermain</h1>
+        <p class="text-lg text-gray-600 mb-8 font-bold">
+          Gunakan jarimu di depan kamera!
+        </p>
+
+        <div class="flex flex-col md:flex-row gap-6 mb-8">
+          <!-- Langkah 1 -->
+          <div
+            class="flex-1 bg-sky-50 p-4 rounded-3xl border-4 border-sky-200 flex flex-col items-center"
+          >
+            <div class="text-6xl mb-4 animate-bounce-slight">🤏</div>
+            <h3 class="font-black text-sky-800 text-lg">1. Jepit Kartu</h3>
+            <p class="text-sm text-sky-600 font-bold mt-1">
+              Arahkan tangan sampai kartu menyala, lalu jepit jarimu.
+            </p>
+          </div>
+          <!-- Langkah 2 -->
+          <div
+            class="flex-1 bg-green-50 p-4 rounded-3xl border-4 border-green-200 flex flex-col items-center"
+          >
+            <div class="text-6xl mb-4 animate-float">🖐️</div>
+            <h3 class="font-black text-green-800 text-lg">2. Buka & Taruh</h3>
+            <p class="text-sm text-green-600 font-bold mt-1">
+              Geser ke kotak angka yang benar, lalu buka jarimu.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onclick="closeTutorial()"
+          class="bg-yellow-400 hover:bg-yellow-300 text-yellow-900 text-2xl font-black py-4 px-12 rounded-full shadow-[0_8px_0_#b45309] hover:shadow-[0_4px_0_#b45309] hover:translate-y-1 transition-all flex items-center gap-3"
+        >
+          <i data-lucide="play-circle" class="w-8 h-8"></i> Mengerti, Ayo Main!
+        </button>
+      </div>
+    </div>
+
+    <!-- --- VICTORY OVERLAY --- -->
+    <div
+      id="victory-overlay"
+      class="hidden fixed inset-0 z-[60] bg-sky-200/90 backdrop-blur-md flex-col items-center justify-center"
+    >
+      <div
+        id="victory-modal"
+        class="bg-white p-10 rounded-[3rem] shadow-2xl border-8 border-yellow-400 flex flex-col items-center max-w-xl text-center scale-0"
+      >
+        <div
+          class="w-24 h-24 bg-yellow-400 rounded-full border-4 border-white flex items-center justify-center mb-6 shadow-lg"
+        >
+          <i data-lucide="award" class="text-white w-12 h-12"></i>
+        </div>
+
+        <h1 class="text-5xl font-black text-gray-800 mb-2">Luar Biasa!</h1>
+        <p class="text-xl text-gray-600 mb-6 font-bold">
+          Kamu berhasil menyusun Pancasila!
+        </p>
+
+        <div class="flex gap-4 mb-8">
+          <div
+            class="bg-yellow-100 p-4 rounded-2xl flex flex-col items-center border-4 border-yellow-200"
+          >
+            <span class="text-3xl">⭐ 3</span>
+            <span class="font-bold text-yellow-700 text-sm">Bintang</span>
+          </div>
+          <div
+            class="bg-green-100 p-4 rounded-2xl flex flex-col items-center border-4 border-green-200"
+          >
+            <span class="text-3xl font-black text-green-600">+50</span>
+            <span class="font-bold text-green-700 text-sm">XP Bonus</span>
+          </div>
+        </div>
+
+        <button
+          onclick="window.location.reload()"
+          class="bg-green-500 hover:bg-green-400 text-white text-2xl font-black py-4 px-12 rounded-full shadow-[0_8px_0_#15803d] hover:shadow-[0_4px_0_#15803d] hover:translate-y-1 transition-all"
+        >
+          Lanjutkan Petualangan
+        </button>
+      </div>
+    </div>
+
+    <!-- --- JAVASCRIPT LOGIC --- -->
+    <script>
+      // Audio System
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const audioCtx = new AudioContext();
+
+      function playSound(type) {
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === "success") {
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+          osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+          osc.frequency.setValueAtTime(1046.5, audioCtx.currentTime + 0.2);
+          gain.gain.setValueAtTime(0, audioCtx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+          gain.gain.exponentialRampToValueAtTime(
+            0.01,
+            audioCtx.currentTime + 0.4,
+          );
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.4);
+        } else if (type === "error") {
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(
+            150,
+            audioCtx.currentTime + 0.3,
+          );
+          gain.gain.setValueAtTime(0, audioCtx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+          gain.gain.exponentialRampToValueAtTime(
+            0.01,
+            audioCtx.currentTime + 0.3,
+          );
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.3);
+        }
+      }
+
+      // Data Permainan
+      const silaData = [
+        {
+          id: 1,
+          icon: "⭐",
+          text: "Ketuhanan Yang Maha Esa",
+          color: "bg-yellow-400",
+          border: "border-yellow-200",
+        },
+        {
+          id: 2,
+          icon: "🔗",
+          text: "Kemanusiaan yang Adil dan Beradab",
+          color: "bg-red-400",
+          border: "border-red-200",
+        },
+        {
+          id: 3,
+          icon: "🌳",
+          text: "Persatuan Indonesia",
+          color: "bg-green-500",
+          border: "border-green-300",
+        },
+        {
+          id: 4,
+          icon: "🐃",
+          text: "Kerakyatan yang Dipimpin oleh Hikmat Kebijaksanaan",
+          color: "bg-orange-500",
+          border: "border-orange-300",
+        },
+        {
+          id: 5,
+          icon: "🌾",
+          text: "Keadilan Sosial bagi Seluruh Rakyat Indonesia",
+          color: "bg-amber-500",
+          border: "border-amber-200",
+        },
+      ];
+
+      let xp = 80;
+      let correctPlacements = 0;
+      let isGameActive = false;
+
+      // Render UI
+      const slotsContainer = document.getElementById("slots-container");
+      const cardsContainer = document.getElementById("cards-container");
+      const owlMessage = document.getElementById("owl-message");
+
+      function initGame() {
+        slotsContainer.innerHTML = "";
+        cardsContainer.innerHTML = "";
+
+        for (let i = 1; i <= 5; i++) {
+          const slot = document.createElement("div");
+          slot.className = `slot w-32 h-36 md:w-40 md:h-44 bg-white/50 backdrop-blur-sm border-4 border-dashed border-gray-400 rounded-3xl flex flex-col items-center justify-center relative shadow-inner`;
+          slot.dataset.id = i;
+          slot.id = `slot-${i}`;
+          slot.innerHTML = `
+                    <span class="text-4xl font-black text-gray-300 absolute z-0">${i}</span>
+                    <div class="slot-content absolute inset-0 z-10 p-2 flex items-center justify-center pointer-events-none"></div>
+                `;
+          slotsContainer.appendChild(slot);
+        }
+
+        const shuffledCards = [...silaData].sort(() => Math.random() - 0.5);
+
+        shuffledCards.forEach((sila) => {
+          const card = document.createElement("div");
+          card.className = `draggable-card ${sila.color} ${sila.border} border-4 rounded-2xl w-32 h-32 md:w-40 md:h-40 flex flex-col items-center justify-center p-2 text-center shadow-[0_8px_0_rgba(0,0,0,0.15)] flex-shrink-0 cursor-grab relative z-20`;
+          card.dataset.id = sila.id;
+          card.id = `card-${sila.id}`;
+          card.innerHTML = `
+                    <span class="text-4xl md:text-5xl drop-shadow-md mb-2 pointer-events-none">${sila.icon}</span>
+                    <span class="text-white font-bold text-[10px] md:text-xs leading-tight pointer-events-none bg-black/20 px-2 py-1 rounded-lg w-full line-clamp-3">${sila.text}</span>
+                `;
+          cardsContainer.appendChild(card);
+        });
+      }
+
+      function closeTutorial() {
+        document.getElementById("tutorial-overlay").classList.add("hidden");
+        isGameActive = true;
+        if (audioCtx.state === "suspended") audioCtx.resume();
+      }
+
+      // --- SISTEM DRAG & DROP LEBIH RESPONSIF ---
+
+      let targetX = window.innerWidth / 2;
+      let targetY = window.innerHeight / 2;
+      let cursorX = window.innerWidth / 2;
+      let cursorY = window.innerHeight / 2;
+
+      let isPinching = false;
+      let grabbedCard = null;
+      let currentHoveredSlot = null;
+
+      const cursorEmoji = document.getElementById("cursor-emoji");
+      const cursorElement = document.getElementById("hand-cursor");
+
+      function updateGameLoop() {
+        // Smoothing kursor: 0.5 (Menyeimbangkan respon cepat dengan kestabilan agar tidak bergetar)
+        cursorX += (targetX - cursorX) * 0.5;
+        cursorY += (targetY - cursorY) * 0.5;
+
+        cursorElement.style.left = `${cursorX}px`;
+        cursorElement.style.top = `${cursorY}px`;
+
+        if (isGameActive) {
+          if (isPinching) {
+            if (grabbedCard) {
+              // Terus update posisi saat menggenggam
+              grabbedCard.style.left = `${cursorX}px`;
+              grabbedCard.style.top = `${cursorY}px`;
+              checkSlotHover();
+            } else {
+              // Coba ambil jika jari dijepit dekat kartu
+              tryGrabCard();
+            }
+          } else {
+            // Cek apakah tangan sedang berada tepat di atas kartu (Hover Feedback visual)
+            highlightHoveredCard();
+
+            // Lepaskan jika tangan dibuka
+            if (grabbedCard) {
+              handleDrop();
+            }
+          }
+        }
+
+        requestAnimationFrame(updateGameLoop);
+      }
+
+      function highlightHoveredCard() {
+        const cards = document.querySelectorAll(".draggable-card:not(.placed)");
+        let minDistance = 80;
+        let closestCard = null;
+
+        cards.forEach((card) => card.classList.remove("hover-highlight"));
+
+        for (let card of cards) {
+          const rect = card.getBoundingClientRect();
+          const cardCenterX = rect.left + rect.width / 2;
+          const cardCenterY = rect.top + rect.height / 2;
+          const distance = Math.hypot(
+            cursorX - cardCenterX,
+            cursorY - cardCenterY,
+          );
+
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestCard = card;
+          }
+        }
+
+        if (closestCard) {
+          closestCard.classList.add("hover-highlight");
+        }
+      }
+
+      function tryGrabCard() {
+        const cards = document.querySelectorAll(".draggable-card:not(.placed)");
+        let minDistance = 80; // Radius lebih kecil supaya harus disengaja
+        let closestCard = null;
+
+        for (let card of cards) {
+          const rect = card.getBoundingClientRect();
+          const cardCenterX = rect.left + rect.width / 2;
+          const cardCenterY = rect.top + rect.height / 2;
+          const distance = Math.hypot(
+            cursorX - cardCenterX,
+            cursorY - cardCenterY,
+          );
+
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestCard = card;
+          }
+        }
+
+        if (closestCard) {
+          grabbedCard = closestCard;
+          closestCard.classList.remove("hover-highlight");
+          closestCard.classList.add("dragging");
+          owlMessage.innerText = "Bagus! Sekarang geser ke kotak angkanya.";
+          playSound("success");
+        }
+      }
+
+      function checkSlotHover() {
+        const slots = document.querySelectorAll(".slot:not(.filled)");
+        let foundHover = null;
+        let minDistance = 120; // Radius slot lebih besar seperti magnet
+
+        slots.forEach((slot) => {
+          const rect = slot.getBoundingClientRect();
+          const slotCenterX = rect.left + rect.width / 2;
+          const slotCenterY = rect.top + rect.height / 2;
+          const distance = Math.hypot(
+            cursorX - slotCenterX,
+            cursorY - slotCenterY,
+          );
+
+          if (distance < minDistance) {
+            minDistance = distance;
+            foundHover = slot;
+          }
+          slot.classList.remove("hovered");
+        });
+
+        if (foundHover) {
+          foundHover.classList.add("hovered");
+          currentHoveredSlot = foundHover;
+        } else {
+          currentHoveredSlot = null;
+        }
+      }
+
+      function handleDrop() {
+        const card = grabbedCard;
+        const slot = currentHoveredSlot;
+
+        card.classList.remove("dragging");
+        if (slot) slot.classList.remove("hovered");
+
+        if (slot && slot.dataset.id === card.dataset.id) {
+          // BENAR!
+          playSound("success");
+          confetti({
+            particleCount: 30,
+            spread: 50,
+            origin: {
+              x: cursorX / window.innerWidth,
+              y: cursorY / window.innerHeight,
+            },
+          });
+
+          card.classList.add("placed");
+          card.style.left = ""; // HAPUS POSISI BEBAS FIX PENTING
+          card.style.top = ""; // HAPUS POSISI BEBAS FIX PENTING
+          slot.querySelector(".slot-content").appendChild(card);
+          slot.classList.add("filled", "border-green-400", "bg-green-50");
+
+          owlMessage.innerText = "Benar sekali! Lanjutkan!";
+          document.getElementById(`dot-${card.dataset.id}`).className =
+            "w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-sm dot";
+
+          xp = Math.min(xp + 10, 100);
+          document.getElementById("xp-text").innerText = `${xp} / 100 XP`;
+          document.getElementById("xp-bar-fill").style.width = `${xp}%`;
+
+          correctPlacements++;
+          if (correctPlacements >= 5) {
+            setTimeout(showVictory, 1000);
+          }
+        } else {
+          // SALAH ATAU DILEPAS DI LUAR
+          if (slot) {
+            playSound("error");
+            owlMessage.innerText = `Ups! Itu bukan tempat untuk Sila ke-${card.dataset.id}. Coba lagi!`;
+          } else {
+            owlMessage.innerText = "Arahkan tanganmu lalu jepit kartu!";
+          }
+
+          // MENGATASI BUG HILANG: RESET KORDINAT STYLE KE KOSONG
+          card.style.left = "";
+          card.style.top = "";
+
+          card.classList.add("animate-wiggle");
+          setTimeout(() => card.classList.remove("animate-wiggle"), 300);
+        }
+
+        grabbedCard = null;
+        currentHoveredSlot = null;
+      }
+
+      function showVictory() {
+        const overlay = document.getElementById("victory-overlay");
+        const modal = document.getElementById("victory-modal");
+        overlay.classList.remove("hidden");
+        overlay.classList.add("flex");
+        modal.classList.add("animate-pop-in");
+
+        const end = Date.now() + 3000;
+        (function frame() {
+          confetti({
+            particleCount: 5,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0 },
+          });
+          confetti({
+            particleCount: 5,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1 },
+          });
+          if (Date.now() < end) requestAnimationFrame(frame);
+        })();
+      }
+
+      // --- SISTEM PELACAKAN TANGAN (MediaPipe) ---
+
+      const videoElement = document.getElementById("input_video");
+      const camStatus = document.getElementById("cam-status");
+      const camIndicator = document.getElementById("cam-indicator");
+
+      function setPinchState(pinching) {
+        if (isPinching !== pinching) {
+          isPinching = pinching;
+          cursorEmoji.innerText = isPinching ? "🤏" : "🖐️";
+          cursorElement.style.transform = isPinching
+            ? "translate(-50%, -50%) scale(0.8)"
+            : "translate(-50%, -50%) scale(1)";
+        }
+      }
+
+      async function initCamera() {
+        try {
+          const hands = new Hands({
+            locateFile: (file) => {
+              return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+            },
+          });
+
+          hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 0,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.7,
+          });
+
+          hands.onResults((results) => {
+            cursorElement.style.opacity = "1";
+            if (
+              results.multiHandLandmarks &&
+              results.multiHandLandmarks.length > 0
+            ) {
+              const landmarks = results.multiHandLandmarks[0];
+              const thumbTip = landmarks[4];
+              const indexTip = landmarks[8];
+
+              // FIX AKURASI: Konversi koordinat AI langsung ke Pixel Layar mutlak
+              const screenThumbX = (1 - thumbTip.x) * window.innerWidth; // Dibalik (Mirror)
+              const screenThumbY = thumbTip.y * window.innerHeight;
+              const screenIndexX = (1 - indexTip.x) * window.innerWidth;
+              const screenIndexY = indexTip.y * window.innerHeight;
+
+              // Jarak murni dalam Pixel agar jepitan stabil di semua ukuran layar
+              const distanceInPixels = Math.hypot(
+                screenThumbX - screenIndexX,
+                screenThumbY - screenIndexY,
+              );
+
+              // Threshold Anti-getar berbasis Pixel (60px untuk jepit, 100px untuk lepas)
+              if (!isPinching && distanceInPixels < 60) {
+                setPinchState(true);
+              } else if (isPinching && distanceInPixels > 100) {
+                setPinchState(false);
+              }
+
+              // Target kursor berada tepat di tengah-tengah jari
+              targetX = (screenThumbX + screenIndexX) / 2;
+              targetY = (screenThumbY + screenIndexY) / 2;
+            }
+          });
+
+          const camera = new Camera(videoElement, {
+            onFrame: async () => {
+              await hands.send({ image: videoElement });
+            },
+            width: 320,
+            height: 240,
+          });
+
+          await camera.start();
+
+          camStatus.innerText = "REC";
+          camIndicator.className =
+            "w-2 h-2 bg-red-500 rounded-full animate-pulse";
+        } catch (error) {
+          console.error("Kamera tidak dapat diakses:", error);
+          camStatus.innerText = "MOUSE MODE";
+          camIndicator.className = "w-2 h-2 bg-gray-500 rounded-full";
+        }
+      }
+
+      // Fallback Interaksi Mouse
+      document.addEventListener("mousemove", (e) => {
+        cursorElement.style.opacity = "1";
+        targetX = e.clientX;
+        targetY = e.clientY;
+      });
+      document.addEventListener("mousedown", () => setPinchState(true));
+      document.addEventListener("mouseup", () => setPinchState(false));
+
+      document.addEventListener(
+        "touchstart",
+        (e) => {
+          targetX = e.touches[0].clientX;
+          targetY = e.touches[0].clientY;
+          setPinchState(true);
+        },
+        { passive: false },
+      );
+      document.addEventListener(
+        "touchmove",
+        (e) => {
+          targetX = e.touches[0].clientX;
+          targetY = e.touches[0].clientY;
+          e.preventDefault();
+        },
+        { passive: false },
+      );
+      document.addEventListener("touchend", () => setPinchState(false));
+
+      document.addEventListener("DOMContentLoaded", () => {
+        initGame();
+        lucide.createIcons();
+        requestAnimationFrame(updateGameLoop);
+        initCamera();
+      });
+    </script>
+  </body>
+</html>
