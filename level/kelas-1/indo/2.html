@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bahasa Indonesia - Level 1: Vokal & Konsonan</title>
+    <title>Bahasa Indonesia - Level 2: Kata & Gambar</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -125,7 +125,6 @@
         animation: glow-gold 1s ease-in-out;
         border-color: #fde047 !important;
         background-color: #fef08a !important;
-        color: #b45309 !important;
       }
 
       @keyframes pulse-ring {
@@ -262,10 +261,10 @@
           <h2
             class="font-black text-xl text-blue-900 tracking-wide drop-shadow-sm"
           >
-            Penjelajah Level 1
+            Penjelajah Level 2
           </h2>
           <div class="flex text-yellow-500 drop-shadow">
-            <i data-lucide="star" class="w-4 h-4 text-gray-400"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-current"></i>
             <i data-lucide="star" class="w-4 h-4 text-gray-400"></i>
             <i data-lucide="star" class="w-4 h-4 text-gray-400"></i>
           </div>
@@ -301,7 +300,7 @@
             class="bg-white px-4 py-3 rounded-2xl rounded-br-none shadow-xl border-4 border-blue-200 mb-2 max-w-[220px]"
           >
             <p id="owl-message" class="font-bold text-blue-900 text-sm">
-              Klik ikon speaker untuk mendengar suara huruf!
+              Pilih gambar yang sesuai dengan kata!
             </p>
           </div>
           <svg
@@ -360,39 +359,41 @@
         id="game-card"
         class="bg-white/95 backdrop-blur-sm p-8 rounded-[3rem] shadow-[0_15px_30px_rgba(0,0,0,0.15)] border-8 border-white max-w-4xl w-[90%] md:w-[700px] flex flex-col items-center pointer-events-auto transition-transform duration-300 min-h-[450px]"
       >
-        <!-- --- FASE 1: TEBAK HURUF --- -->
+        <!-- --- FASE 1: TEBAK GAMBAR --- -->
         <div id="phase-guess" class="w-full flex flex-col items-center">
-          <!-- Judul & Speaker -->
-          <div class="text-center mb-6">
+          <div
+            class="bg-blue-100 text-blue-600 font-black px-6 py-2 rounded-full uppercase tracking-widest text-sm mb-4 inline-block border-2 border-blue-200"
+          >
+            Pasangkan Kata dengan Gambar!
+          </div>
+
+          <!-- Judul Kata & Speaker -->
+          <div class="flex items-center justify-center gap-4 mb-6">
+            <!-- Kartu Kata Besar -->
             <div
-              class="bg-blue-100 text-blue-600 font-black px-6 py-2 rounded-full uppercase tracking-widest text-sm mb-4 inline-block border-2 border-blue-200"
+              id="word-display"
+              class="text-5xl md:text-6xl font-black text-blue-800 bg-white px-8 py-4 rounded-3xl border-4 border-blue-300 shadow-[0_8px_0_#93c5fd] tracking-wider uppercase"
             >
-              Temukan Huruf yang Benar!
+              KUCING
             </div>
 
+            <!-- Ikon Speaker -->
             <div
-              class="flex flex-col items-center justify-center cursor-pointer option-btn"
+              class="flex flex-col items-center justify-center cursor-pointer option-btn w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full shadow-[0_6px_0_#1e3a8a] border-4 border-white hover:scale-110 transition-transform"
               id="btn-speaker"
               onclick="playCurrentLetterSound()"
             >
-              <div
-                class="w-20 h-20 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full shadow-[0_8px_0_#1e3a8a] border-4 border-white flex items-center justify-center mb-3 animate-bounce-slight hover:scale-110 transition-transform"
-              >
-                <i
-                  data-lucide="volume-2"
-                  class="text-white w-10 h-10 pointer-events-none"
-                ></i>
-              </div>
-              <p class="font-bold text-gray-500 text-sm pointer-events-none">
-                Klik untuk mendengar suara
-              </p>
+              <i
+                data-lucide="volume-2"
+                class="text-white w-8 h-8 md:w-10 md:h-10 pointer-events-none"
+              ></i>
             </div>
           </div>
 
-          <!-- Opsi Jawaban -->
+          <!-- Opsi Jawaban Gambar -->
           <div
             id="options-container"
-            class="flex flex-wrap justify-center gap-6 w-full mb-6 mt-4"
+            class="flex flex-wrap justify-center gap-6 w-full mb-6 mt-2"
           >
             <!-- Di-render oleh JS -->
           </div>
@@ -401,45 +402,48 @@
         <!-- --- FASE 2: UCAPKAN (MICROPHONE) --- -->
         <div
           id="phase-voice"
-          class="w-full flex-col items-center justify-center hidden pt-8"
+          class="w-full flex-col items-center justify-center hidden pt-6"
         >
           <h2 class="text-3xl font-black text-gray-800 mb-2">Hebat!</h2>
-          <p class="text-xl text-gray-500 font-bold mb-10">
-            Sekarang giliranmu ucapkan huruf
+          <p class="text-xl text-gray-500 font-bold mb-6">
+            Sekarang giliranmu ucapkan kata
             <span
               id="target-letter-display"
-              class="text-blue-500 font-black text-3xl"
-              >A</span
+              class="text-blue-500 font-black text-3xl uppercase"
+              >KUCING</span
             >
           </p>
 
           <!-- Ikon Mic -->
           <div
             id="btn-mic"
-            class="option-btn w-32 h-32 bg-blue-100 rounded-full border-8 border-blue-200 flex items-center justify-center mb-8 relative cursor-pointer hover:scale-105 transition-transform"
+            class="option-btn w-28 h-28 bg-blue-100 rounded-full border-8 border-blue-200 flex items-center justify-center mb-6 relative cursor-pointer hover:scale-105 transition-transform"
           >
             <div id="mic-pulse" class="absolute inset-0 rounded-full"></div>
             <i
               data-lucide="mic"
-              class="text-blue-500 w-16 h-16 relative z-10 pointer-events-none"
+              class="text-blue-500 w-14 h-14 relative z-10 pointer-events-none"
             ></i>
           </div>
 
-          <p
-            id="voice-feedback"
-            class="text-lg font-bold text-blue-600 mb-2 text-center"
+          <!-- Tempat Teks Speech-to-Text -->
+          <div
+            class="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 w-full max-w-sm shadow-inner mb-4 min-h-[90px] flex items-center justify-center"
           >
-            Menyiapkan pendengaran...
-          </p>
-          <!-- Menambahkan elemen untuk menampilkan teks yang diucapkan -->
-          <p
-            id="recognized-text"
-            class="text-md font-semibold text-gray-600 mb-6 text-center italic h-6"
-          ></p>
+            <p
+              id="recognized-text"
+              class="text-lg font-bold text-gray-600 text-center"
+            >
+              Kata yang kamu ucapkan:<br />
+              <span class="text-gray-400 text-base font-normal"
+                >Mendengarkan suaramu...</span
+              >
+            </p>
+          </div>
 
           <button
             onclick="skipVoicePhase()"
-            class="text-gray-400 underline font-bold hover:text-gray-600 z-20"
+            class="text-gray-400 underline font-bold hover:text-gray-600 z-20 mt-2"
           >
             Lewati / Suara tidak terdengar
           </button>
@@ -466,7 +470,7 @@
       </div>
     </div>
 
-    <!-- --- VICTORY OVERLAY TERBARU --- -->
+    <!-- --- VICTORY OVERLAY --- -->
     <div
       id="victory-overlay"
       class="hidden fixed inset-0 z-[60] bg-sky-200/90 backdrop-blur-md flex-col items-center justify-center"
@@ -560,7 +564,7 @@
           onclick="window.location.reload()"
           class="bg-gradient-to-r from-green-400 to-green-500 hover:from-green-500 hover:to-green-600 text-white text-2xl font-black py-4 px-12 rounded-full shadow-[0_8px_0_#15803d] hover:shadow-[0_4px_0_#15803d] hover:translate-y-1 transition-all w-full md:w-auto z-10"
         >
-          Lanjut ke Level 2
+          Lanjut ke Level 3
         </button>
       </div>
     </div>
@@ -621,13 +625,38 @@
         }
       }
 
-      // --- Data Permainan ---
+      // --- Data Permainan (Level 2: Kata & Gambar) ---
       const rounds = [
-        { target: "A", speechSound: "A", options: ["A", "B", "E"] },
-        { target: "I", speechSound: "I", options: ["I", "U", "O"] },
-        { target: "B", speechSound: "B", options: ["B", "D", "P"] },
-        { target: "M", speechSound: "M", options: ["M", "N", "W"] },
-        { target: "S", speechSound: "S", options: ["S", "C", "T"] },
+        {
+          word: "KUCING",
+          speechSound: "kucing",
+          target: "🐱",
+          options: ["🐱", "🐶", "🐟"],
+        },
+        {
+          word: "APEL",
+          speechSound: "apel",
+          target: "🍎",
+          options: ["🍎", "🍌", "🍇"],
+        },
+        {
+          word: "BUKU",
+          speechSound: "buku",
+          target: "📖",
+          options: ["📖", "✏️", "🧸"],
+        },
+        {
+          word: "BOLA",
+          speechSound: "bola",
+          target: "⚽",
+          options: ["⚽", "🚗", "🏀"],
+        },
+        {
+          word: "IKAN",
+          speechSound: "ikan",
+          target: "🐟",
+          options: ["🐟", "🐔", "🐄"],
+        },
       ];
 
       const colorPalettes = [
@@ -673,8 +702,8 @@
       const optionsContainer = document.getElementById("options-container");
       const owlMessage = document.getElementById("owl-message");
       const cursorEmoji = document.getElementById("cursor-emoji");
-      const voiceFeedback = document.getElementById("voice-feedback");
       const recognizedTextDisplay = document.getElementById("recognized-text");
+      const wordDisplay = document.getElementById("word-display");
 
       let recognition = null;
       let isListening = false;
@@ -710,19 +739,22 @@
         phaseGuess.classList.remove("hidden");
         phaseGuess.classList.add("flex");
 
-        owlMessage.innerText = "Klik ikon speaker lalu pilih huruf yang tepat!";
+        // Update Teks Kata
+        wordDisplay.innerText = round.word;
+
+        owlMessage.innerText = "Pilih gambar yang sesuai dengan kata!";
         optionsContainer.innerHTML = "";
 
         const shuffledOptions = [...round.options].sort(
           () => Math.random() - 0.5,
         );
 
-        shuffledOptions.forEach((letter, index) => {
+        shuffledOptions.forEach((pic, index) => {
           const btn = document.createElement("div");
           const palette = colorPalettes[index % colorPalettes.length];
 
-          btn.id = `btn-${letter}`;
-          btn.className = `option-btn relative w-32 h-40 md:w-36 md:h-44 rounded-3xl flex items-center justify-center border-4 transition-all duration-300 cursor-pointer text-white font-black text-6xl md:text-7xl ${palette.bg} ${palette.border} ${palette.shadow}`;
+          btn.id = `btn-${pic}`;
+          btn.className = `option-btn relative w-32 h-40 md:w-36 md:h-44 rounded-3xl flex items-center justify-center border-4 transition-all duration-300 cursor-pointer text-6xl md:text-7xl ${palette.bg} ${palette.border} ${palette.shadow}`;
 
           btn.addEventListener(
             "mouseenter",
@@ -736,9 +768,10 @@
               !isAnimating &&
               btn.classList.remove("scale-105", "animate-bounce-slight"),
           );
-          btn.addEventListener("click", () => handleSelection(letter));
+          btn.addEventListener("click", () => handleSelection(pic));
 
-          btn.innerHTML = `<span class="drop-shadow-lg pointer-events-none">${letter}</span>`;
+          // Emojis don't need drop shadow for text, but keeping it consistent
+          btn.innerHTML = `<span class="drop-shadow-lg pointer-events-none">${pic}</span>`;
           optionsContainer.appendChild(btn);
         });
 
@@ -761,17 +794,17 @@
         isAnimating = false;
       }
 
-      function handleSelection(selectedLetter) {
+      function handleSelection(selectedPic) {
         if (isAnimating || currentState !== "GUESSING") return;
         isAnimating = true;
 
         const round = rounds[currentRound];
-        const btn = document.getElementById(`btn-${selectedLetter}`);
+        const btn = document.getElementById(`btn-${selectedPic}`);
 
-        if (selectedLetter === round.target) {
+        if (selectedPic === round.target) {
           playSound("success");
           btn.classList.add("animate-glow-gold");
-          owlMessage.innerText = "Pintar! Sekarang kita berlatih mengucapkan.";
+          owlMessage.innerText = "Pintar! Sekarang ucapkan katanya.";
           confetti({ particleCount: 30, spread: 40, origin: { y: 0.6 } });
 
           setTimeout(() => {
@@ -842,7 +875,7 @@
           const audioBar = document.getElementById("audio-bar");
 
           function updateVisualizer() {
-            if (currentState !== "VOICE") return; // Berhenti menggambar jika bukan fase voice
+            if (currentState !== "VOICE") return;
 
             analyser.getByteFrequencyData(dataArray);
             let sum = 0;
@@ -850,11 +883,9 @@
               sum += dataArray[i];
             }
             let average = sum / bufferLength;
-            // Normalisasi tinggi (dikalikan 2 agar lebih responsif)
-            let height = Math.min(100, average * 2);
+            let height = Math.min(100, average * 2.5);
             audioBar.style.height = height + "%";
 
-            // Ubah warna berdasarkan intensitas suara
             if (height > 60) {
               audioBar.className =
                 "w-full bg-red-500 transition-all duration-75";
@@ -880,7 +911,6 @@
         container.classList.remove("flex");
 
         if (visualizerFrameId) cancelAnimationFrame(visualizerFrameId);
-        // Kita biarkan stream tetap menyala untuk ronde berikutnya agar tidak perlu request permission ulang
       }
 
       // --- SISTEM PENGENALAN SUARA (VOICE RECOGNITION) ---
@@ -893,16 +923,13 @@
         phaseVoice.classList.remove("hidden");
         phaseVoice.classList.add("flex");
 
-        // Nyalakan Visualizer Kiri
         startAudioVisualizer();
 
         const round = rounds[currentRound];
-        document.getElementById("target-letter-display").innerText =
-          round.target;
-        voiceFeedback.innerText = "Mendengarkan... Ayo ucapkan hurufnya beberapa kali!";
-        voiceFeedback.className = "text-lg font-bold text-blue-600 mb-2";
-        recognizedTextDisplay.innerText = ""; // Bersihkan teks sebelumnya
-        owlMessage.innerText = `Ayo ucapkan huruf "${round.target}" dengan lantang!`;
+        document.getElementById("target-letter-display").innerText = round.word;
+
+        recognizedTextDisplay.innerHTML = `Kata yang kamu ucapkan:<br><span class="text-gray-400 text-base font-normal">Mendengarkan suaramu...</span>`;
+        owlMessage.innerText = `Ayo ucapkan kata "${round.word}" dengan lantang!`;
 
         window.SpeechRecognition =
           window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -914,8 +941,8 @@
           }
           recognition = new SpeechRecognition();
           recognition.lang = "id-ID";
-          recognition.interimResults = false;
-          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.continuous = false;
           recognition.maxAlternatives = 1;
 
           recognition.onstart = () => {
@@ -923,29 +950,43 @@
             document
               .getElementById("mic-pulse")
               .classList.add("animate-pulse-ring");
-            voiceFeedback.innerText = "Mendengarkan... Ayo ucapkan hurufnya beberapa kali!";
-            voiceFeedback.className = "text-lg font-bold text-blue-600 mb-2";
-            recognizedTextDisplay.innerText = "";
           };
 
           recognition.onresult = (event) => {
             if (currentState !== "VOICE") return;
 
-            const transcript = event.results[0][0].transcript
+            let interimTranscript = "";
+            let finalTranscript = "";
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+              if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript;
+              } else {
+                interimTranscript += event.results[i][0].transcript;
+              }
+            }
+
+            const currentTranscript = (finalTranscript || interimTranscript)
               .toLowerCase()
               .trim();
+            console.log("Mendengar:", currentTranscript);
 
-            // DEBUG
-            console.log("Speech detected:", transcript);
-            console.log("Raw result:", event.results);
+            if (currentTranscript) {
+              recognizedTextDisplay.innerHTML = `Kata yang kamu ucapkan:<br><span class="text-blue-600 text-2xl font-black">"${currentTranscript}"</span>`;
 
-            recognizedTextDisplay.innerText = `Kata yang kamu ucapkan: "${transcript}"`;
-
-            checkPronunciation(transcript, round.target);
+              const isCorrect = checkPronunciationMatch(
+                currentTranscript,
+                round.word,
+              );
+              if (isCorrect) {
+                successVoicePhase();
+              } else if (finalTranscript) {
+                failVoicePhase(finalTranscript);
+              }
+            }
           };
 
           recognition.onerror = (event) => {
-            // Cegah spam error di console
             if (event.error !== "no-speech" && event.error !== "aborted") {
               console.warn("Mic error:", event.error);
             }
@@ -953,35 +994,34 @@
             if (currentState !== "VOICE") return;
 
             if (event.error === "not-allowed") {
-              voiceFeedback.innerText = "Izin mikrofon ditolak.";
-              voiceFeedback.className = "text-lg font-bold text-red-500 mb-2";
+              recognizedTextDisplay.innerHTML = `Kata yang kamu ucapkan:<br><span class="text-red-500 text-base font-normal">Izin mikrofon ditolak!</span>`;
               document
                 .getElementById("mic-pulse")
                 .classList.remove("animate-pulse-ring");
             } else if (event.error === "no-speech") {
-              // Jika anak diam saja, beri tahu lalu restart diam-diam
-              voiceFeedback.innerText =
-                "Sedang mendengarkan... (Cek bar di kiri)";
-              voiceFeedback.className =
-                "text-lg font-bold text-orange-500 mb-2";
+              recognizedTextDisplay.innerHTML = `Kata yang kamu ucapkan:<br><span class="text-orange-500 text-base font-normal">Tidak ada suara terdengar...</span>`;
             } else if (event.error === "aborted") {
-              // Abort normal saat restart
+              // Abort normal
             } else {
-              voiceFeedback.innerText = "Tekan tombol lewati jika kesulitan.";
-              voiceFeedback.className = "text-lg font-bold text-red-500 mb-2";
+              recognizedTextDisplay.innerHTML = `Kata yang kamu ucapkan:<br><span class="text-red-500 text-base font-normal">Terjadi kesalahan, coba lewati.</span>`;
             }
           };
 
           recognition.onend = () => {
             isListening = false;
-
             document
               .getElementById("mic-pulse")
               .classList.remove("animate-pulse-ring");
 
-            if (currentState === "VOICE") {
-              voiceFeedback.innerText = "Tekan mic lalu ucapkan huruf";
-              voiceFeedback.className = "text-lg font-bold text-blue-600 mb-2";
+            if (currentState === "VOICE" && voiceRetryTimeout === null) {
+              voiceRetryTimeout = setTimeout(() => {
+                voiceRetryTimeout = null;
+                if (currentState === "VOICE" && !isListening) {
+                  try {
+                    recognition.start();
+                  } catch (e) {}
+                }
+              }, 1000);
             }
           };
 
@@ -989,10 +1029,45 @@
             recognition.start();
           } catch (e) {}
         } else {
-          voiceFeedback.innerText =
-            "Browser tidak mendukung suara. Silakan tekan lewati.";
-          voiceFeedback.className = "text-lg font-bold text-orange-500 mb-2";
+          recognizedTextDisplay.innerHTML = `Kata yang kamu ucapkan:<br><span class="text-orange-500 text-base font-normal">Browser tidak mendukung mikrofon.</span>`;
         }
+      }
+
+      function checkPronunciationMatch(spokenText, targetWord) {
+        // Sistem pencocokan fonetik untuk kata-kata
+        const validMap = {
+          KUCING: ["kucing", "ucing", "kucin", "cing"],
+          APEL: ["apel", "apeul", "apelnya", "pel"],
+          BUKU: ["buku", "bukunya", "ku"],
+          BOLA: ["bola", "bolanya", "la"],
+          IKAN: ["ikan", "kan"],
+        };
+        const validOptions = validMap[targetWord] || [targetWord.toLowerCase()];
+        return validOptions.some((opt) => spokenText.includes(opt));
+      }
+
+      function failVoicePhase(spokenText) {
+        playSound("error");
+
+        if (recognition) {
+          try {
+            recognition.abort();
+          } catch (e) {}
+        }
+
+        clearTimeout(voiceRetryTimeout);
+        voiceRetryTimeout = setTimeout(() => {
+          voiceRetryTimeout = null;
+          if (currentState === "VOICE" && !isListening) {
+            recognizedTextDisplay.innerHTML = `Kata yang kamu ucapkan:<br><span class="text-gray-400 text-base font-normal">Coba ucapkan lagi...</span>`;
+            try {
+              recognition.start();
+              document
+                .getElementById("mic-pulse")
+                .classList.add("animate-pulse-ring");
+            } catch (e) {}
+          }
+        }, 2000);
       }
 
       const micBtn = document.getElementById("btn-mic");
@@ -1000,63 +1075,18 @@
         if (!isListening && recognition && currentState === "VOICE") {
           clearTimeout(voiceRetryTimeout);
           voiceRetryTimeout = null;
-          voiceFeedback.innerText = "Mendengarkan... Ayo ucapkan!";
-          voiceFeedback.className = "text-lg font-bold text-blue-600 mb-2";
-          recognizedTextDisplay.innerText = "";
+          recognizedTextDisplay.innerHTML = `Kata yang kamu ucapkan:<br><span class="text-gray-400 text-base font-normal">Mendengarkan suaramu...</span>`;
           try {
             recognition.start();
           } catch (e) {}
         }
       };
 
-      function checkPronunciation(spokenText, targetLetter) {
-        clearTimeout(voiceRetryTimeout);
-        voiceRetryTimeout = null;
-
-        const validMap = {
-          A: ["a", "aa", "ah", "ha"],
-          I: ["i", "ii", "ih", "hi"],
-          B: ["b", "be", "beh", "bi", "de"],
-          M: ["m", "em", "eum", "ma", "am"],
-          S: ["s", "es", "ess", "sa", "as"],
-        };
-
-        const validOptions = validMap[targetLetter] || [
-          targetLetter.toLowerCase(),
-        ];
-        const isCorrect = validOptions.some((opt) => spokenText.includes(opt));
-
-        if (isCorrect) {
-          successVoicePhase();
-        } else {
-          playSound("error");
-          voiceFeedback.innerText = "Coba lagi!";
-          voiceFeedback.className = "text-lg font-bold text-red-500 mb-2";
-
-          voiceRetryTimeout = setTimeout(() => {
-            voiceRetryTimeout = null;
-            if (currentState === "VOICE" && !isListening) {
-              voiceFeedback.innerText = "Mendengarkan... Ayo ucapkan!";
-              voiceFeedback.className = "text-lg font-bold text-blue-600 mb-2";
-              recognizedTextDisplay.innerText = "";
-              try {
-                setTimeout(() => {
-                  try {
-                    recognition.start();
-                  } catch (e) {}
-                }, 500);
-              } catch (e) {}
-            }
-          }, 2000);
-        }
-      }
-
       function successVoicePhase() {
         currentState = "SUCCESS";
         clearTimeout(voiceRetryTimeout);
         voiceRetryTimeout = null;
 
-        // Matikan visualizer
         stopAudioVisualizer();
 
         if (recognition) {
@@ -1069,9 +1099,7 @@
           .classList.remove("animate-pulse-ring");
 
         playSound("voice-success");
-        voiceFeedback.innerText = "Bagus sekali!";
-        voiceFeedback.className =
-          "text-xl font-black text-green-500 mb-2 animate-bounce-slight";
+        recognizedTextDisplay.innerHTML = `Kata yang kamu ucapkan:<br><span class="text-green-500 text-2xl font-black">Sempurna!</span>`;
         owlMessage.innerText = "Wah, suaramu sangat lantang!";
         confetti({ particleCount: 50, spread: 60, origin: { y: 0.5 } });
 
@@ -1092,7 +1120,6 @@
       }
 
       function skipVoicePhase() {
-        // Fungsi jika mic bermasalah, anak tetap bisa lanjut main
         successVoicePhase();
       }
 
@@ -1211,7 +1238,6 @@
           }
         });
 
-        // Pastikan hanya mendeteksi tombol yang relevan dengan fase yang sedang aktif
         let isValidHover = false;
         if (btnHovered && !isAnimating) {
           const isMicBtn = btnHovered.id === "btn-mic";

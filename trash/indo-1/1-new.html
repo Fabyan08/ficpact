@@ -899,7 +899,7 @@
         const round = rounds[currentRound];
         document.getElementById("target-letter-display").innerText =
           round.target;
-        voiceFeedback.innerText = "Mendengarkan... Ayo ucapkan hurufnya beberapa kali!";
+        voiceFeedback.innerText = "Mendengarkan... Ayo ucapkan!";
         voiceFeedback.className = "text-lg font-bold text-blue-600 mb-2";
         recognizedTextDisplay.innerText = ""; // Bersihkan teks sebelumnya
         owlMessage.innerText = `Ayo ucapkan huruf "${round.target}" dengan lantang!`;
@@ -914,8 +914,8 @@
           }
           recognition = new SpeechRecognition();
           recognition.lang = "id-ID";
-          recognition.interimResults = false;
-          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.continuous = false;
           recognition.maxAlternatives = 1;
 
           recognition.onstart = () => {
@@ -923,7 +923,7 @@
             document
               .getElementById("mic-pulse")
               .classList.add("animate-pulse-ring");
-            voiceFeedback.innerText = "Mendengarkan... Ayo ucapkan hurufnya beberapa kali!";
+            voiceFeedback.innerText = "Mendengarkan... Ayo ucapkan!";
             voiceFeedback.className = "text-lg font-bold text-blue-600 mb-2";
             recognizedTextDisplay.innerText = "";
           };
@@ -931,17 +931,16 @@
           recognition.onresult = (event) => {
             if (currentState !== "VOICE") return;
 
-            const transcript = event.results[0][0].transcript
+            const resultIndex = event.resultIndex;
+            const transcript = event.results[resultIndex][0].transcript
               .toLowerCase()
               .trim();
 
-            // DEBUG
-            console.log("Speech detected:", transcript);
-            console.log("Raw result:", event.results);
-
             recognizedTextDisplay.innerText = `Kata yang kamu ucapkan: "${transcript}"`;
 
-            checkPronunciation(transcript, round.target);
+            checkPronunciation(transcript, rounds[currentRound].target);
+
+            recognition.stop();
           };
 
           recognition.onerror = (event) => {
@@ -980,14 +979,21 @@
               .classList.remove("animate-pulse-ring");
 
             if (currentState === "VOICE") {
-              voiceFeedback.innerText = "Tekan mic lalu ucapkan huruf";
-              voiceFeedback.className = "text-lg font-bold text-blue-600 mb-2";
+              setTimeout(() => {
+                try {
+                  recognition.start();
+                } catch (e) {}
+              }, 300);
             }
           };
 
-          try {
-            recognition.start();
-          } catch (e) {}
+          setTimeout(() => {
+            try {
+              recognition.start();
+            } catch (e) {
+              console.log("Mic auto start error:", e);
+            }
+          }, 300);
         } else {
           voiceFeedback.innerText =
             "Browser tidak mendukung suara. Silakan tekan lewati.";
